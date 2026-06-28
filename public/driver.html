@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>FleetTrack — Chauffeur</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --rouge: #CC0000;
+      --rouge-vif: #FF2222;
+      --noir: #0f0f0f;
+      --noir-2: #1a1a1a;
+      --blanc: #ffffff;
+      --gris: #888;
+      --bg: #f5f5f5;
+      --route-color: #1a73e8;
+      --route-border: #0d47a1;
+    }
+ 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); min-height: 100vh; }
+ 
+    /* ── HEADER ── */
+    .header {
+      background: var(--noir);
+      padding: 0 20px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      border-bottom: 2px solid var(--rouge);
+    }
+    .header-logo { display: flex; align-items: center; gap: 10px; }
+    .logo-text { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 1px; }
+    .logo-text span:first-child { color: white; }
+    .logo-text span:last-child  { color: var(--rouge); }
+    .header-user { display: flex; align-items: center; gap: 10px; }
+    .header-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--rouge);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 13px; font-weight: 600;
+    }
+    .header-name { color: #999; font-size: 13px; }
+    .btn-logout-sm {
+      background: transparent; border: 1px solid #333; color: #555;
+      padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .btn-logout-sm:hover { border-color: var(--rouge); color: var(--rouge); }
+ 
+    .screen { display: none; }
+    .screen.active { display: block; }
+ 
+    /* ── ÉCRAN SÉLECTION ── */
+    #screen-selection { max-width: 480px; margin: 0 auto; padding: 30px 20px; }
+    .screen-title { font-family: 'Bebas Neue', cursive; font-size: 28px; letter-spacing: 1px; color: var(--noir); margin-bottom: 6px; }
+    .screen-sub { font-size: 14px; color: var(--gris); margin-bottom: 24px; }
+    .tabs { display: flex; background: white; border-radius: 10px; padding: 4px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--gris); transition: all 0.2s; }
+    .tab.active { background: var(--noir); color: white; }
+    .vehicles-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .vehicle-card {
+      background: white; border-radius: 10px; padding: 16px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; border: 2px solid transparent;
+      transition: all 0.2s; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .vehicle-card:hover { border-color: #e0e0e0; }
+    .vehicle-card.selected { border-color: var(--rouge); background: #fff8f8; }
+    .vehicle-card.unavailable { opacity: 0.5; cursor: not-allowed; }
+    .vehicle-icon { width: 44px; height: 44px; border-radius: 10px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .vehicle-info { flex: 1; }
+    .vehicle-name { font-weight: 600; font-size: 15px; color: var(--noir); }
+    .vehicle-plate { display: inline-block; margin-top: 3px; font-size: 12px; background: #f5f5f5; padding: 2px 8px; border-radius: 4px; font-family: monospace; color: #555; }
+    #qr-reader { border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+    .btn-main {
+      width: 100%; padding: 16px; background: var(--rouge); color: white;
+      border: none; border-radius: 10px; font-family: 'Bebas Neue', cursive;
+      font-size: 20px; letter-spacing: 2px; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-main:hover { background: var(--rouge-vif); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(204,0,0,0.25); }
+    .btn-main:disabled { background: #ccc; transform: none; box-shadow: none; cursor: not-allowed; }
+ 
+    /* ── ÉCRAN MISSION ── */
+    #screen-mission { height: calc(100vh - 56px); display: none; flex-direction: column; position: relative; }
+    #screen-mission.active { display: flex; }
+ 
+    /* Barre véhicule en haut */
+    .mission-bar {
+      background: var(--noir);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 400;
+    }
+    .mission-vehicle { font-family: 'Bebas Neue', cursive; font-size: 17px; color: white; letter-spacing: 1px; }
+    .mission-plate { font-size: 11px; color: #666; font-family: monospace; }
+    .live-pill {
+      display: flex; align-items: center; gap: 5px;
+      background: rgba(204,0,0,0.15); border: 1px solid rgba(204,0,0,0.3);
+      padding: 4px 10px; border-radius: 20px; font-size: 11px; color: var(--rouge-vif); font-weight: 600;
+    }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rouge-vif); animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+ 
+    /* Carte — prend tout l'espace restant */
+    #map-driver { flex: 1; min-height: 0; z-index: 1; }
+ 
+    /* ── PANNEAU DESTINATIONS flottant ── */
+    .search-bar-float {
+      position: absolute;
+      top: 12px;
+      left: 12px; right: 12px;
+      z-index: 500;
+    }
+ 
+    .search-container {
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      overflow: visible;
+      position: relative;
+    }
+ 
+    /* Ligne saisie */
+    .search-row {
+      display: flex;
+      align-items: center;
+      padding: 0 6px 0 14px;
+      gap: 8px;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .search-row:focus-within { border-bottom-color: #f0f0f0; }
+ 
+    .search-icon { font-size: 15px; flex-shrink: 0; color: var(--rouge); }
+ 
+    .search-input {
+      flex: 1;
+      padding: 13px 0;
+      border: none;
+      outline: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14.5px;
+      color: var(--noir);
+      background: transparent;
+    }
+    .search-input::placeholder { color: #bbb; }
+ 
+    .btn-add-dest {
+      padding: 7px 14px;
+      background: var(--noir);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-add-dest:hover { background: var(--rouge); }
+ 
+    /* Liste des étapes ajoutées */
+    .dest-list {
+      display: none;
+      padding: 6px 12px 10px;
+      border-top: 1px solid #f5f5f5;
+    }
+ 
+    .dest-list.has-items { display: block; }
+ 
+    .dest-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 4px;
+      font-size: 13px;
+      color: #333;
+      border-bottom: 1px solid #fafafa;
+      animation: fadeSlide 0.2s ease;
+    }
+    @keyframes fadeSlide { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+ 
+    .dest-item:last-child { border-bottom: none; }
+ 
+    .dest-num {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--rouge);
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+ 
+    .dest-name { flex: 1; font-weight: 500; }
+ 
+    .dest-remove {
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: all 0.15s;
+      line-height: 1;
+    }
+    .dest-remove:hover { color: var(--rouge); background: #fff0f0; }
+ 
+    /* Bouton calculer */
+    .btn-calculer {
+      display: none;
+      width: calc(100% - 24px);
+      margin: 0 12px 12px;
+      padding: 11px;
+      background: var(--rouge);
+      color: white;
+      border: none;
+      border-radius: 9px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      letter-spacing: 0.3px;
+    }
+    .btn-calculer.visible { display: block; }
+    .btn-calculer:hover { background: var(--rouge-vif); }
+ 
+    /* Suggestions autocomplete */
+    .suggestions-box {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0; right: 0;
+      background: white;
+      border-radius: 0 0 14px 14px;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.15);
+      overflow: hidden;
+      z-index: 600;
+      max-height: 220px;
+      overflow-y: auto;
+      border-top: 1px solid #f0f0f0;
+    }
+ 
+    .suggestion-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 16px;
+      cursor: pointer;
+      transition: background 0.12s;
+      font-size: 13.5px;
+      color: var(--noir);
+      border-bottom: 1px solid #fafafa;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #f8f8f8; }
+    .suggestion-icon { font-size: 13px; flex-shrink: 0; color: var(--gris); }
+    .suggestion-main { font-weight: 500; }
+    .suggestion-sub  { font-size: 11px; color: var(--gris); margin-top: 1px; }
+ 
+    /* ── CARTE D'ITINÉRAIRE style Yango ── */
+    .route-card {
+      position: absolute;
+      bottom: 12px;
+      left: 12px; right: 12px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+      z-index: 500;
+      display: none;
+      overflow: hidden;
+      animation: slideUp 0.3s cubic-bezier(0.34,1.4,0.64,1);
+    }
+ 
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+ 
+    .route-card-header {
+      background: var(--noir);
+      padding: 11px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+ 
+    .route-dest {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+ 
+    .route-dest-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+ 
+    .route-dest-icon {
+      width: 22px; height: 22px;
+      background: var(--rouge);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+ 
+    .route-etapes-badge {
+      background: rgba(255,255,255,0.15);
+      color: #ccc;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+ 
+    .route-close {
+      background: #333;
+      border: none;
+      color: #888;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+      margin-left: 10px;
+      flex-shrink: 0;
+    }
+    .route-close:hover { background: var(--rouge); color: white; }
+ 
+    .route-stats {
+      display: flex;
+      padding: 14px 16px;
+    }
+ 
+    .route-stat {
+      flex: 1;
+      text-align: center;
+      position: relative;
+    }
+ 
+    .route-stat + .route-stat::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 20%; bottom: 20%;
+      width: 1px;
+      background: #f0f0f0;
+    }
+ 
+    .route-stat-val {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 30px;
+      letter-spacing: 1px;
+      color: var(--noir);
+      line-height: 1;
+    }
+ 
+    .route-stat-unit {
+      font-size: 11px;
+      color: var(--gris);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 2px;
+    }
+ 
+    .route-stat-label {
+      font-size: 10px;
+      color: #bbb;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 768px) {
+      .route-stats {
+        padding: 8px 16px;
+      }
+      .route-stat-val {
+        font-size: 22px;
+      }
+      .route-card-header {
+        padding: 8px 12px;
+      }
+      .search-bar-float {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+      }
+    }
+ 
+    /* ── BOTTOM PANEL ── */
+    .bottom-panel {
+      background: white;
+      border-top: 1px solid #f0f0f0;
+      flex-shrink: 0;
+      z-index: 400;
+    }
+ 
+    .gps-stats {
+      display: flex;
+      padding: 8px 16px;
+      gap: 16px;
+      border-bottom: 1px solid #f5f5f5;
+      background: #fafafa;
+    }
+    .gps-stat { text-align: center; }
+    .gps-stat-value { font-family: 'Bebas Neue', cursive; font-size: 19px; color: var(--noir); }
+    .gps-stat-label { font-size: 9px; color: var(--gris); text-transform: uppercase; letter-spacing: 0.5px; }
+ 
+    .action-btns { display: flex; gap: 8px; padding: 10px 16px 14px; }
+ 
+    .btn-arrive {
+      flex: 1; padding: 13px;
+      background: #f0fdf4; color: #16a34a;
+      border: 1.5px solid #bbf7d0;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-arrive:hover { background: #dcfce7; }
+ 
+    .btn-fin {
+      flex: 1; padding: 13px;
+      background: #fff0f0; color: var(--rouge);
+      border: 1.5px solid #fecaca;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-fin:hover { background: #ffe0e0; }
+ 
+    /* ── NOTIF ── */
+    .notif {
+      position: fixed;
+      top: 66px; left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: var(--noir); color: white;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; z-index: 2000;
+      opacity: 0; transition: all 0.3s;
+      white-space: nowrap; pointer-events: none;
+      max-width: 90vw; text-align: center;
+    }
+    .notif.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .notif.success { border-bottom: 3px solid #22c55e; }
+    .notif.error   { border-bottom: 3px solid var(--rouge); }
+    .notif.info    { border-bottom: 3px solid #3b82f6; }
+ 
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge.disponible  { background:#f0fdf4; color:#16a34a; }
+    .badge.en_mission  { background:#fff0f0; color:var(--rouge); }
+    .badge.maintenance { background:#fffbeb; color:#d97706; }
+    .badge.hors_service{ background:#f9fafb; color:#6b7280; }
+ 
+    /* Pulsing marker CSS */
+    .pulse-marker {
+      width: 20px; height: 20px;
+      position: relative;
+    }
+    .pulse-dot {
+      width: 14px; height: 14px;
+      background: #1a73e8;
+      border: 3px solid white;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px; left: 3px;
+      box-shadow: 0 2px 8px rgba(26,115,232,0.6);
+    }
+    .pulse-ring {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(26,115,232,0.4);
+      border-radius: 50%;
+      position: absolute;
+      top: 0; left: 0;
+      animation: ring 2s ease-out infinite;
+    }
+    @keyframes ring {
+      0%   { transform: scale(1);   opacity: 0.8; }
+      100% { transform: scale(2.2); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+ 
+<div class="notif" id="notif"></div>
+ 
+<!-- HEADER -->
+<header class="header">
+  <div class="header-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" width="32" height="32">
+      <defs><linearGradient id="rg4" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#CC0000"/>
+        <stop offset="100%" style="stop-color:#FF2222"/>
+      </linearGradient></defs>
+      <path d="M30 2 C16.2 2 5 13.2 5 27 C5 45.5 30 58 30 58 C30 58 55 45.5 55 27 C55 13.2 43.8 2 30 2Z" fill="url(#rg4)"/>
+      <circle cx="30" cy="27" r="10" fill="#1a1a1a"/>
+      <circle cx="30" cy="27" r="4" fill="#FF2222"/>
+    </svg>
+    <div class="logo-text"><span>Fleet</span><span>Track</span></div>
+  </div>
+  <div class="header-user">
+    <div class="header-avatar" id="headerAvatar">C</div>
+    <span class="header-name" id="headerName">Chauffeur</span>
+    <button class="btn-logout-sm" onclick="seDeconnecter()">✕</button>
+  </div>
+</header>
+ 
+<!-- ══ ÉCRAN SÉLECTION ══ -->
+<div class="screen active" id="screen-selection">
+  <div id="screen-selection-inner" style="max-width:480px;margin:0 auto;padding:30px 20px;">
+    <div class="screen-title">Prendre un véhicule</div>
+    <div class="screen-sub">Scanne le QR code ou sélectionne manuellement</div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('manuel')">📋 Manuel</div>
+      <div class="tab" onclick="switchTab('qr')">📷 QR Code</div>
+    </div>
+    <div id="tab-manuel">
+      <div class="vehicles-grid" id="vehiclesGrid">
+        <p style="text-align:center;color:#bbb;padding:30px">Chargement...</p>
+      </div>
+    </div>
+    <div id="tab-qr" style="display:none">
+      <div id="qr-reader"></div>
+      <p style="text-align:center;font-size:13px;color:var(--gris);margin-bottom:16px">Pointe la caméra vers le QR code du véhicule</p>
+    </div>
+    <!-- Bouton rendre véhicule — visible seulement si véhicule actif -->
+    <div id="vehiculeActifBanner" style="display:none;
+      background:#fff8f0;border:1.5px solid #f59e0b;border-radius:10px;
+      padding:14px 16px;margin-bottom:14px;">
+      <div style="font-size:13px;color:#92400e;font-weight:600;margin-bottom:8px">
+        🚗 Vous avez un véhicule en cours
+      </div>
+      <div id="vehiculeActifNom" style="font-size:15px;font-weight:700;color:#1a1a1a;margin-bottom:10px"></div>
+      <button onclick="rendreVehicule()" style="
+        width:100%;padding:12px;background:#f59e0b;color:white;border:none;
+        border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;
+        font-weight:600;cursor:pointer">
+        🏠 Fin de journée — Rendre le véhicule  
+      </button>
+    </div>
+    <button class="btn-main" id="btnDemarrer" onclick="demarrerMission()" disabled>
+      DÉMARRER LA MISSION
+    </button>
+  </div>
+</div>
+ 
+<!-- ══ ÉCRAN MISSION ══ -->
+<div class="screen" id="screen-mission">
+ 
+  <!-- Barre véhicule -->
+  <div class="mission-bar">
+    <div>
+      <div class="mission-vehicle" id="missionVehicleName">—</div>
+      <div class="mission-plate" id="missionVehiclePlate">—</div>
+    </div>
+    <div class="live-pill">
+      <div class="live-dot"></div>
+      GPS EN DIRECT
+    </div>
+  </div>
+ 
+  <!-- Panneau destinations flottant -->
+  <div class="search-bar-float" id="searchBarFloat">
+    <div class="search-container" id="searchContainer">
+      <!-- Ligne saisie -->
+      <div class="search-row">
+        <span class="search-icon">📍</span>
+        <input
+          type="text"
+          id="destinationInput"
+          class="search-input"
+          placeholder="Ajouter une destination…"
+          oninput="onDestinationInput()"
+          onkeydown="if(event.key==='Enter') ajouterDestination()"
+          autocomplete="off"
+        >
+        <button class="btn-add-dest" onclick="ajouterDestination()">+ Destination</button>
+      </div>
+      <!-- Suggestions -->
+      <div class="suggestions-box" id="suggestionsBox"></div>
+      <!-- Liste des étapes -->
+      <div class="dest-list" id="destList"></div>
+      <!-- Bouton calculer -->
+      <button class="btn-calculer" id="btnCalculer" onclick="calculerItineraire()">
+        🗺️ Calculer l'itinéraire
+      </button>
+    </div>
+  </div>
+ 
+  <!-- Carte -->
+  <div id="map-driver"></div>
+ 
+  <!-- Carte info itinéraire style Yango -->
+  <div class="route-card" id="routeCard">
+    <div class="route-card-header">
+      <div class="route-dest">
+        <div class="route-dest-icon">📍</div>
+        <span class="route-dest-text" id="routeDestLabel">Destination</span>
+        <span class="route-etapes-badge" id="routeEtapesBadge"></span>
+      </div>
+      <button class="route-close" onclick="fermerItineraire()">✕</button>
+    </div>
+    <div class="route-stats">
+      <div class="route-stat">
+        <div class="route-stat-val" id="routeDuree">—</div>
+        <div class="route-stat-unit">min</div>
+        <div class="route-stat-label">Durée</div>
+      </div>
+      <div class="route-stat">
+        <div class="route-stat-val" id="routeDistance">—</div>
+        <div class="route-stat-unit">km</div>
+        <div class="route-stat-label">Distance</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- Bottom panel -->
+  <div class="bottom-panel">
+    <div class="gps-stats">
+      <div class="gps-stat">
+        <div class="gps-stat-value" id="gpsLat">—</div>
+        <div class="gps-stat-label">Latitude</div>
+      </div>
+      <div class="gps-stat">
+        <div class="gps-stat-value" id="gpsLng">—</div>
+        <div class="gps-stat-label">Longitude</div>
+      </div>
+      <div class="gps-stat">
+        <div class="gps-stat-value" id="gpsUpdates">0</div>
+        <div class="gps-stat-label">Mises à jour</div>
+      </div>
+      <div class="gps-stat">
+        <div class="gps-stat-value" id="gpsPrecision">—</div>
+        <div class="gps-stat-label">Précision (m)</div>
+      </div>
+    </div>
+    <div class="action-btns">
+      <button class="btn-arrive" onclick="signalerArrivee()">✅ Je suis arrivé</button>
+      <button class="btn-fin" onclick="terminerMission()">🏁 Terminer mission</button>
+    </div>
+  </div>
+ 
+</div><!-- fin screen-mission -->
+ 
+<script>
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+if (!user) window.location.href = '/login.html';
+if (user.isAdmin) window.location.href = '/admin.html';
+ 
+document.getElementById('headerName').textContent   = user?.name || 'Chauffeur';
+document.getElementById('headerAvatar').textContent = (user?.name || 'C')[0].toUpperCase();
+ 
+// ── BLOC 1 ──────────────────────────────────────────────────
+// Remplace la ligne : const socket = io();
+// Par ce bloc (enregistrement Service Worker + socket)
+// ────────────────────────────────────────────────────────────
+ 
+const socket = io();
+let swRegistration = null;
+ 
+// Enregistrement du Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => {
+      swRegistration = reg;
+      console.log('[SW] Enregistré ✓', reg.scope);
+    })
+    .catch(err => console.warn('[SW] Échec enregistrement:', err));
+}
+let vehiculeSelectionne = JSON.parse(localStorage.getItem('vehiculeSelectionne') || 'null');
+let missionActive       = JSON.parse(localStorage.getItem('missionActive') || 'null');
+let carteDriver         = null;
+let marqueurPos         = null;
+let polylineTrajet      = null;
+let gpsWatchId          = null;
+let gpsUpdates          = 0;
+let trajetPoints        = [];
+let qrScanner           = null;
+let suggestTimer        = null;
+
+// Reprend la mission active au rechargement
+if (missionActive && vehiculeSelectionne) {
+  document.getElementById('screen-selection').classList.remove('active');
+  document.getElementById('screen-mission').classList.add('active');
+  document.getElementById('missionVehicleName').textContent  = missionActive.nom;
+  document.getElementById('missionVehiclePlate').textContent = missionActive.plaque;
+  setTimeout(() => {
+    carteDriver = L.map('map-driver', { zoomControl: false }).setView([5.3600, -4.0083], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(carteDriver);
+    L.control.zoom({ position: 'bottomright' }).addTo(carteDriver);
+
+    const mapEl = carteDriver.getContainer();
+    ['searchBarFloat','routeCard'].forEach(id => {
+      const el = document.getElementById(id);
+      mapEl.appendChild(el);
+      el.style.position = 'absolute';
+      el.style.zIndex = '500';
+    });
+    document.getElementById('searchBarFloat').style.top   = '12px';
+    document.getElementById('searchBarFloat').style.left  = '12px';
+    document.getElementById('searchBarFloat').style.right = '12px';
+    document.getElementById('routeCard').style.bottom = '10px';
+    document.getElementById('routeCard').style.left   = '12px';
+    document.getElementById('routeCard').style.right  = '12px';
+
+    notif('🔄 Mission en cours récupérée', 'info');
+    socket.emit('chauffeur_identifie', {
+      vehicule_id:  vehiculeSelectionne.id, // id véhicule
+      vehicule_nom: missionActive.nom,
+      plaque:       missionActive.plaque,
+      chauffeur:    user.name || 'Chauffeur',
+      mission_id:   missionActive.id        // id mission séparé
+    });
+
+    lancerGPS();
+  }, 150);
+}
+
+
+// ── Gestion itinéraire ──
+let routeLayers    = [];   // tableau de L.Polyline à supprimer
+let destMarkers    = [];   // tableau de L.Marker destinations
+let destinations   = [];   // [{ label, lat, lng }, ...]
+let pendingCoords  = null; // coords de la suggestion sélectionnée
+let vehiculeActif  = null;
+
+ 
+// ══════════════════════════════════════════════
+//  VÉHICULES
+// ══════════════════════════════════════════════
+async function chargerVehicules() {
+  try {
+    const r = await fetch('/api/vehicles');
+    const vehicules = await r.json();
+    const grid = document.getElementById('vehiclesGrid');
+    if (!vehicules.length) {
+      grid.innerHTML = '<p style="text-align:center;color:#bbb;padding:30px">Aucun véhicule</p>';
+      return;
+    }
+    grid.innerHTML = vehicules.map(v => {
+      const dispo = !v.statut || v.statut === 'disponible';
+      return `<div class="vehicle-card ${!dispo ? 'unavailable' : ''}" id="vcard-${v.id}"
+           onclick="${dispo ? `selectionnerVehicule(${v.id},'${v.name}','${v.license_plate||''}',this)` : ''}">
+        <div class="vehicle-icon">🚗</div>
+        <div class="vehicle-info">
+          <div class="vehicle-name">${v.name}</div>
+          <span class="vehicle-plate">${v.license_plate || '—'}</span>
+        </div>
+        ${badgeStatut(v.statut)}
+      </div>`;
+    }).join('');
+  } catch(e) { notif('Erreur chargement véhicules', 'error'); }
+}
+ 
+function selectionnerVehicule(id, nom, plaque, el) {
+  vehiculeSelectionne = { id, nom, plaque };
+  document.querySelectorAll('.vehicle-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('btnDemarrer').disabled = false;
+  notif(`🚗 ${nom} sélectionné`, 'info');
+}
+ 
+// ══════════════════════════════════════════════
+//  TABS QR
+// ══════════════════════════════════════════════
+function switchTab(tab) {
+  const isManuel = tab === 'manuel';
+  document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', isManuel ? i===0 : i===1));
+  document.getElementById('tab-manuel').style.display = isManuel ? 'block' : 'none';
+  document.getElementById('tab-qr').style.display     = isManuel ? 'none'  : 'block';
+  if (!isManuel) demarrerQR(); else arreterQR();
+}
+ 
+function demarrerQR() {
+  if (qrScanner) return;
+  qrScanner = new Html5Qrcode('qr-reader');
+  qrScanner.start({ facingMode:'environment' }, { fps:10, qrbox:{width:250,height:250} },
+    (text) => {
+      try {
+        const data = JSON.parse(text);
+        if (data.vehicule_id) {
+          vehiculeSelectionne = { id:data.vehicule_id, nom:data.nom||'Véhicule', plaque:data.plaque||'' };
+          document.getElementById('btnDemarrer').disabled = false;
+          arreterQR(); switchTab('manuel');
+          notif(`✅ ${data.plaque||data.nom} scanné`, 'success');
+        }
+      } catch(e) {}
+    }, ()=>{}
+  ).catch(() => notif('Caméra inaccessible','error'));
+}
+ 
+function arreterQR() {
+  if (qrScanner) { qrScanner.stop().catch(()=>{}); qrScanner = null; }
+}
+ 
+// ══════════════════════════════════════════════
+//  DÉMARRER MISSION
+// ══════════════════════════════════════════════
+async function demarrerMission() {
+  if (!vehiculeSelectionne) return;
+  const btn = document.getElementById('btnDemarrer');
+  btn.textContent = 'DÉMARRAGE...'; btn.disabled = true;
+  try {
+    await fetch(`/api/vehicles/${vehiculeSelectionne.id}/statut`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ statut:'occupe' })
+    });
+    const r = await fetch('/api/missions', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ vehicle_id:vehiculeSelectionne.id, driver_name:user.name||'Chauffeur', driver_uid:  user.uid, heure_debut:new Date().toISOString() })
+    });
+    const data = await r.json();
+    if (!data.success) throw new Error(data.message);
+    missionActive = { id:data.id, ...vehiculeSelectionne };
+    localStorage.setItem('missionActive', JSON.stringify(missionActive));
+    localStorage.setItem('vehiculeSelectionne', JSON.stringify(vehiculeSelectionne));
+
+    // Identifie le chauffeur auprès du serveur avec la mission
+    socket.emit('chauffeur_identifie', {
+      vehicule_id:  vehiculeSelectionne.id,
+      vehicule_nom: vehiculeSelectionne.name,
+      plaque:       vehiculeSelectionne.license_plate,
+      chauffeur:    user.name || 'Chauffeur',
+      mission_id:   data.id
+    });
+
+lancerEcranMission();
+  } catch(e) {
+    notif('Erreur : ' + e.message, 'error');
+    btn.textContent = 'DÉMARRER LA MISSION'; btn.disabled = false;
+  }
+}
+ 
+// ══════════════════════════════════════════════
+//  LANCER L'ÉCRAN MISSION
+// ══════════════════════════════════════════════
+function lancerEcranMission() {
+  arreterQR();
+  document.getElementById('screen-selection').classList.remove('active');
+  document.getElementById('screen-mission').classList.add('active');
+  document.getElementById('missionVehicleName').textContent  = missionActive.nom;
+  document.getElementById('missionVehiclePlate').textContent = missionActive.plaque;
+ 
+  setTimeout(() => {
+    carteDriver = L.map('map-driver', { zoomControl: false }).setView([5.3600, -4.0083], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(carteDriver);
+    L.control.zoom({ position: 'bottomright' }).addTo(carteDriver);
+ 
+    // Injecter les éléments flottants dans le conteneur de la carte
+    const mapEl = carteDriver.getContainer();
+    ['searchBarFloat','routeCard'].forEach(id => {
+      const el = document.getElementById(id);
+      mapEl.appendChild(el);
+      el.style.position = 'absolute';
+      el.style.zIndex = '500';
+    });
+    document.getElementById('searchBarFloat').style.top    = '12px';
+    document.getElementById('searchBarFloat').style.left   = '12px';
+    document.getElementById('searchBarFloat').style.right  = '12px';
+    document.getElementById('routeCard').style.bottom  = '10px';
+    document.getElementById('routeCard').style.left    = '12px';
+    document.getElementById('routeCard').style.right   = '12px';
+    
+    socket.emit('chauffeur_identifie', {
+    vehicule_id:  vehiculeSelectionne.id, // id véhicule
+    vehicule_nom: missionActive.nom,
+    plaque:       missionActive.plaque,
+    chauffeur:    user.name || 'Chauffeur',
+    mission_id:   missionActive.id        // id mission séparé
+    });
+    lancerGPS();
+  }, 150);
+}
+ 
+// ══════════════════════════════════════════════
+//  GPS
+// ══════════════════════════════════════════════
+function lancerGPS() {
+  if (!navigator.geolocation) {
+    notif('GPS non disponible sur cet appareil', 'error');
+    return;
+  }
+
+  // Demande explicite de permission avec un message clair
+  const accepte = confirm(
+    '📍 FleetTrack a besoin d\'accéder à votre position GPS.\n\n' +
+    'Cette autorisation est nécessaire pour :\n' +
+    '• Afficher votre position sur la carte\n' +
+    '• Calculer les itinéraires\n' +
+    '• Transmettre votre position à l\'administrateur\n\n' +
+    'Voulez-vous autoriser l\'accès à votre position ?'
+  );
+
+  if (!accepte) {
+    notif('❌ GPS refusé — certaines fonctionnalités seront limitées', 'error');
+    // Désactive les boutons GPS
+    document.querySelector('.btn-arrive').disabled = true;
+    document.querySelector('.btn-arrive').style.opacity = '0.5';
+    return;
+  }
+
+  notif('🔍 Recherche de votre position...', 'info');
+
+  // Demande la position une première fois pour déclencher la permission du navigateur
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      notif('✅ GPS activé !', 'success');
+      // Lance le suivi continu après accord
+      demarrerSuiviGPS();
+    },
+    (err) => {
+      if (err.code === 1) {
+        // Permission refusée par le navigateur
+        notif('❌ Permission GPS refusée dans le navigateur', 'error');
+        afficherGuidePermission();
+      } else if (err.code === 2) {
+        notif('⚠️ Position GPS introuvable', 'error');
+      } else {
+        notif('⚠️ Délai GPS dépassé — réessai...', 'info');
+        demarrerSuiviGPS();
+      }
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function demarrerSuiviGPS() {
+  gpsWatchId = navigator.geolocation.watchPosition(pos => {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    gpsUpdates++;
+    document.getElementById('gpsLat').textContent       = lat.toFixed(4);
+    document.getElementById('gpsLng').textContent       = lng.toFixed(4);
+    document.getElementById('gpsUpdates').textContent   = gpsUpdates;
+    document.getElementById('gpsPrecision').textContent = Math.round(accuracy);
+ 
+    if (carteDriver) {
+      if (!marqueurPos) {
+        const pulseIcon = L.divIcon({
+          html: `<div class="pulse-marker"><div class="pulse-ring"></div><div class="pulse-dot"></div></div>`,
+          className: '', iconSize: [20, 20], iconAnchor: [10, 10]
+        });
+        marqueurPos = L.marker([lat, lng], { icon: pulseIcon, zIndexOffset: 1000 }).addTo(carteDriver);
+        carteDriver.setView([lat, lng], 15);
+        carteDriver.panTo([lat, lng]);
+      } else {
+        marqueurPos.setLatLng([lat, lng]);
+        if (!routeLayers.length) carteDriver.panTo([lat, lng]);
+      }
+ 
+      trajetPoints.push([lat, lng]);
+      if (polylineTrajet) carteDriver.removeLayer(polylineTrajet);
+      if (trajetPoints.length > 1) {
+        polylineTrajet = L.polyline(trajetPoints, {
+          color: 'rgba(204,0,0,0.45)', weight: 3, opacity: 0.7
+        }).addTo(carteDriver);
+      }
+    }
+ 
+    const positionData = {
+      vehicule_id:  vehiculeSelectionne.id,
+      vehicule_nom: missionActive.nom,
+      plaque:       missionActive.plaque,
+      mission_id:   missionActive.id,
+      lat, lng,
+      timestamp:    new Date().toISOString()
+    };
+ 
+    // ── Envoi 1 : Socket.io (temps réel admin) ──
+    socket.emit('gps_position', positionData);
+ 
+    // ── Envoi 2 : Service Worker (background + file d'attente) ──
+    if (swRegistration && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'GPS_POSITION',
+        data: positionData
+      });
+    } else {
+      // Fallback direct si SW pas encore actif
+      fetch('/api/gps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mission_id: missionActive.id,
+          latitude: lat,
+          longitude: lng,
+          timestamp: new Date().toISOString()
+        })
+      }).catch(() => {});
+    }
+ 
+  }, err => notif('GPS : ' + err.message, 'error'),
+  { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
+}
+
+function afficherGuidePermission() {
+  const guide = `
+    ⚠️ Le navigateur a bloqué l'accès au GPS.\n\n
+    Pour l'activer :\n
+    • Clique sur l'icône 🔒 ou ⚠️ dans la barre d'adresse\n
+    • Sélectionne "Autorisations du site"\n
+    • Mets "Localisation" sur Autoriser\n
+    • Recharge la page
+  `;
+  alert(guide);
+}
+ 
+// ══════════════════════════════════════════════
+//  AUTOCOMPLETE NOMINATIM
+// ══════════════════════════════════════════════
+function onDestinationInput() {
+  clearTimeout(suggestTimer);
+  pendingCoords = null;
+  const val = document.getElementById('destinationInput').value.trim();
+  const box  = document.getElementById('suggestionsBox');
+  if (val.length < 2) { box.style.display = 'none'; return; }
+ 
+  suggestTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val+", Abidjan, Côte d'Ivoire")}&format=json&limit=5&addressdetails=1`,
+        { headers:{'Accept-Language':'fr'} }
+      );
+      const results = await r.json();
+      if (!results.length) { box.style.display='none'; return; }
+ 
+      box.innerHTML = results.map(res => {
+        const parts = res.display_name.split(',');
+        const main  = parts[0].trim();
+        const sub   = parts.slice(1,3).join(',').trim();
+        return `<div class="suggestion-item"
+          onclick="choisirSuggestion('${main.replace(/'/g,"\\'")}',${res.lat},${res.lon})">
+          <span class="suggestion-icon">📍</span>
+          <div>
+            <div class="suggestion-main">${main}</div>
+            <div class="suggestion-sub">${sub}</div>
+          </div>
+        </div>`;
+      }).join('');
+      box.style.display = 'block';
+    } catch(e) {}
+  }, 350);
+}
+ 
+function choisirSuggestion(label, lat, lon) {
+  document.getElementById('destinationInput').value = label;
+  document.getElementById('suggestionsBox').style.display = 'none';
+  pendingCoords = { lat:parseFloat(lat), lng:parseFloat(lon) };
+}
+ 
+document.addEventListener('click', e => {
+  if (!e.target.closest('#searchContainer'))
+    document.getElementById('suggestionsBox').style.display = 'none';
+});
+ 
+// ══════════════════════════════════════════════
+//  GESTION MULTI-DESTINATIONS
+// ══════════════════════════════════════════════
+async function ajouterDestination() {
+  const input = document.getElementById('destinationInput');
+  const label = input.value.trim();
+  if (!label) { notif('Entre une destination', 'error'); return; }
+ 
+  let coords = pendingCoords;
+ 
+  // Si pas de coords depuis suggestion → géocoder
+  if (!coords) {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(label+', Abidjan')}&format=json&limit=1`
+      );
+      const res = await r.json();
+      if (!res.length) { notif('Destination introuvable', 'error'); return; }
+      coords = { lat:parseFloat(res[0].lat), lng:parseFloat(res[0].lon) };
+    } catch(e) { notif('Erreur de géocodage', 'error'); return; }
+  }
+ 
+  destinations.push({ label, lat:coords.lat, lng:coords.lng });
+  pendingCoords = null;
+  input.value = '';
+  document.getElementById('suggestionsBox').style.display = 'none';
+  renderDestList();
+}
+ 
+function supprimerDestination(index) {
+  destinations.splice(index, 1);
+  renderDestList();
+  // Si plus de destinations → effacer itinéraire
+  if (!destinations.length) fermerItineraire();
+}
+ 
+function renderDestList() {
+  const listEl = document.getElementById('destList');
+  const btnCalc = document.getElementById('btnCalculer');
+ 
+  if (!destinations.length) {
+    listEl.classList.remove('has-items');
+    listEl.innerHTML = '';
+    btnCalc.classList.remove('visible');
+    return;
+  }
+ 
+  listEl.classList.add('has-items');
+  listEl.innerHTML = destinations.map((d, i) => `
+    <div class="dest-item">
+      <div class="dest-num">${i+1}</div>
+      <div class="dest-name">${d.label}</div>
+      <button class="dest-remove" onclick="supprimerDestination(${i})">✕</button>
+    </div>
+  `).join('');
+ 
+  btnCalc.classList.add('visible');
+  btnCalc.textContent = `🗺️ Calculer (${destinations.length} étape${destinations.length>1?'s':''})`;
+}
+ 
+// ══════════════════════════════════════════════
+//  CALCUL ITINÉRAIRE OSRM MULTI-ÉTAPES
+// ══════════════════════════════════════════════
+async function calculerItineraire() {
+  if (!destinations.length) { notif('Ajoute au moins une destination', 'error'); return; }
+
+  // Si GPS pas encore actif → utilise le centre de la carte comme départ
+  if (!marqueurPos) {
+    const centre = carteDriver.getCenter();
+    const pulseIcon = L.divIcon({
+      html: `<div class="pulse-marker"><div class="pulse-ring"></div><div class="pulse-dot"></div></div>`,
+      className: '', iconSize:[20,20], iconAnchor:[10,10]
+    });
+    marqueurPos = L.marker([centre.lat, centre.lng], { icon:pulseIcon, zIndexOffset:1000 })
+      .addTo(carteDriver);
+    notif('📍 GPS non disponible — départ depuis centre de la carte', 'info');
+  }
+ 
+  // Supprimer l'ancien itinéraire proprement
+  effacerItineraireCarte();
+ 
+  const pos = marqueurPos.getLatLng();
+ 
+  // Construction des waypoints : position actuelle + toutes les destinations
+  const waypoints = [
+    `${pos.lng},${pos.lat}`,
+    ...destinations.map(d => `${d.lng},${d.lat}`)
+  ].join(';');
+ 
+  try {
+    const r = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${waypoints}?overview=full&geometries=geojson`
+    );
+    const data = await r.json();
+ 
+    if (!data.routes || !data.routes.length) {
+      notif('Aucun itinéraire trouvé', 'error'); return;
+    }
+ 
+    const route    = data.routes[0];
+    const coords   = route.geometry.coordinates.map(([lng,lat]) => [lat,lng]);
+    const distance = (route.distance/1000).toFixed(1);
+    const duree    = Math.round(route.duration/60);
+ 
+    // ── Trace route double couche style Google ──
+    const border = L.polyline(coords, {
+      color:'#0d47a1', weight:9, opacity:0.25,
+      lineJoin:'round', lineCap:'round'
+    }).addTo(carteDriver);
+ 
+    const main = L.polyline(coords, {
+      color:'#1a73e8', weight:5, opacity:0.95,
+      lineJoin:'round', lineCap:'round'
+    }).addTo(carteDriver);
+ 
+    routeLayers = [border, main];
+ 
+    // ── Marqueurs destinations ──
+    const pinIcon = (num) => L.divIcon({
+      html:`<div style="position:relative;width:30px;height:40px">
+        <div style="width:30px;height:30px;background:#CC0000;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 12px rgba(204,0,0,0.5);border:3px solid white"></div>
+        <div style="position:absolute;top:7px;left:7px;width:12px;height:12px;background:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#CC0000">${num}</div>
+      </div>`,
+      className:'', iconSize:[30,40], iconAnchor:[15,40], popupAnchor:[0,-40]
+    });
+ 
+    destinations.forEach((d, i) => {
+      const m = L.marker([d.lat,d.lng], { icon:pinIcon(i+1), zIndexOffset:900 })
+        .addTo(carteDriver)
+        .bindPopup(`<strong>📍 ${d.label}</strong>`);
+      destMarkers.push(m);
+    });
+ 
+    // ── Zoom sur le trajet ──
+    const allPoints = [[pos.lat,pos.lng], ...destinations.map(d=>[d.lat,d.lng])];
+    carteDriver.fitBounds(L.latLngBounds(allPoints), { padding:[80,80] });
+ 
+    // ── Carte info ──
+    const nbEtapes = destinations.length;
+    document.getElementById('routeDestLabel').textContent  = destinations[destinations.length-1].label;
+    document.getElementById('routeEtapesBadge').textContent = nbEtapes > 1 ? `${nbEtapes} étapes` : '';
+    document.getElementById('routeDuree').textContent       = duree;
+    document.getElementById('routeDistance').textContent    = distance;
+    document.getElementById('routeCard').style.display      = 'block';
+ 
+    // Sauvegarder première destination dans Odoo
+    fetch(`/api/missions/${missionActive.id}/destination`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ destination: destinations.map(d=>d.label).join(' → ') })
+    }).catch(()=>{});
+ 
+    notif(`🗺️ ${distance} km · ${duree} min`, 'success');
+ 
+  } catch(e) {
+    console.error(e);
+    notif('Erreur calcul itinéraire', 'error');
+  }
+}
+ 
+function effacerItineraireCarte() {
+  // Supprime toutes les polylines
+  routeLayers.forEach(l => { try { carteDriver.removeLayer(l); } catch(e){} });
+  routeLayers = [];
+  // Supprime tous les marqueurs destinations
+  destMarkers.forEach(m => { try { carteDriver.removeLayer(m); } catch(e){} });
+  destMarkers = [];
+}
+ 
+function fermerItineraire() {
+  effacerItineraireCarte();
+  document.getElementById('routeCard').style.display = 'none';
+  destinations = [];
+  renderDestList();
+}
+ 
+// ══════════════════════════════════════════════
+//  SIGNALER ARRIVÉE
+// ══════════════════════════════════════════════
+function signalerArrivee() {
+  socket.emit('chauffeur_arrive', {
+    vehicule_id:vehiculeSelectionne.id, vehicule_nom:missionActive.nom,
+    plaque:missionActive.plaque,
+    destination: destinations.map(d=>d.label).join(' → ') || '—',
+    chauffeur:user.name
+  });
+  notif("✅ Arrivée signalée à l'administrateur !", 'success');
+}
+ 
+// ══════════════════════════════════════════════
+//  TERMINER MISSION
+// ══════════════════════════════════════════════
+async function terminerMission() {
+  if (!confirm('Terminer la mission et libérer le véhicule ?')) return;
+  if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+  try {
+    await fetch(`/api/missions/${missionActive.id}/terminer`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ heure_fin:new Date().toISOString() })
+    });
+    await fetch(`/api/vehicles/${vehiculeSelectionne.id}/statut`, {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ statut:'disponible' })
+    });
+    // Notifie le serveur que la mission est terminée
+    socket.emit('vehicule_libere', {
+      vehicule_id: vehiculeSelectionne.id,
+      plaque: vehiculeSelectionne.license_plate
+    });
+    socket.emit('mission_terminee', {
+      mission_id: missionActive.id,
+      vehicule_id: vehiculeSelectionne.id
+    });
+    notif('✅ Mission terminée — Véhicule libéré !', 'success');
+    setTimeout(() => {
+      localStorage.removeItem('missionActive');
+      localStorage.removeItem('vehiculeSelectionne');
+      effacerItineraireCarte();
+      if (carteDriver) { carteDriver.remove(); carteDriver = null; }
+      missionActive = null; vehiculeSelectionne = null;
+      gpsUpdates = 0; trajetPoints = []; marqueurPos = null;
+      polylineTrajet = null; destinations = []; pendingCoords = null;
+      document.getElementById('routeCard').style.display = 'none';
+      document.getElementById('btnDemarrer').textContent = 'DÉMARRER LA MISSION';
+      document.getElementById('btnDemarrer').disabled = true;
+      document.getElementById('screen-mission').classList.remove('active');
+      document.getElementById('screen-selection').classList.add('active');
+      chargerVehicules();
+    }, 1500);
+  } catch(e) { notif('Erreur fin de mission', 'error'); }
+
+}
+ 
+// ══════════════════════════════════════════════
+//  UTILITAIRES
+// ══════════════════════════════════════════════
+function badgeStatut(s) {
+  const m = {
+    disponible:  ['disponible',  '✅ Disponible'],
+    en_mission:  ['en_mission',  '🚀 En mission'],
+    maintenance: ['maintenance', '🔧 Maintenance'],
+    hors_service:['hors_service','⛔ Hors service'],
+    occupe:      ['en_mission',  '🔒 Occupé']
+  };
+  const [cls, lbl] = m[s] || ['disponible','✅ Disponible'];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+ 
+function notif(msg, type='info') {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.className = `notif show ${type}`;
+  setTimeout(() => el.className = 'notif', 3200);
+}
+ 
+function seDeconnecter() {
+  if (missionActive && !confirm('Mission en cours. Quitter ?')) return;
+  if (gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+  arreterQR();
+  localStorage.removeItem('user');
+  window.location.href = '/login.html';
+}
+// ── Vérifier si le chauffeur a un véhicule actif ──
+async function verifierVehiculeActif() {
+  try {
+    const r = await fetch('/api/vehicles');
+    const vehicules = await r.json();
+    
+    // Cherche un véhicule assigné à ce chauffeur
+    const monVehicule = vehicules.find(v => 
+      v.driver_id && v.driver_id[0] === user.uid &&
+      (v.statut === 'occupe' || v.statut === 'en_mission')
+    );
+    
+    const banner = document.getElementById('vehiculeActifBanner');
+    if (monVehicule) {
+      vehiculeActif = monVehicule;
+      document.getElementById('vehiculeActifNom').textContent = 
+        `${monVehicule.name} — ${monVehicule.license_plate || ''}`;
+      banner.style.display = 'block';
+    } else {
+      vehiculeActif = null;
+      banner.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+// ── Rendre le véhicule en fin de journée ──
+async function rendreVehicule() {
+  if (!vehiculeActif) return;
+  if (!confirm(`Rendre le véhicule "${vehiculeActif.name}" et terminer votre journée ?`)) return;
+
+  try {
+    // Libère le véhicule
+    await fetch(`/api/vehicles/${vehiculeActif.id}/statut`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ statut: 'disponible' })
+    });
+
+    notif('✅ Véhicule rendu — Bonne fin de journée !', 'success');
+    vehiculeActif = null;
+    document.getElementById('vehiculeActifBanner').style.display = 'none';
+    chargerVehicules();
+
+  } catch(e) {
+    notif('Erreur lors du retour du véhicule', 'error');
+  }
+}
+ 
+chargerVehicules();
+verifierVehiculeActif();
+
+</script>
+</body>
+</html>
+ 

@@ -1,0 +1,484 @@
+
+Qrcodes · HTML
+Copier
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet App — QR Codes Véhicules</title>
+
+  <!-- QRCode.js pour générer les QR codes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+
+    :root {
+      --noir: #0d0d0d;
+      --blanc: #f5f5f0;
+      --vert: #00c853;
+      --orange: #ff6d00;
+      --gris: #2a2a2a;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--noir);
+      color: var(--blanc);
+      min-height: 100vh;
+    }
+
+    /* ---- HEADER ---- */
+    header {
+      padding: 24px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #222;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: var(--vert); }
+
+    .btn-back {
+      padding: 10px 20px;
+      background: transparent;
+      color: var(--blanc);
+      border: 1px solid #444;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+      background: #222;
+      border-color: var(--vert);
+      color: var(--vert);
+    }
+
+    /* ---- CONTENU ---- */
+    .content {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .page-title {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+    }
+
+    .page-title span { color: var(--vert); }
+
+    .page-subtitle {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 40px;
+    }
+
+    /* ---- BOUTONS ---- */
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      padding: 14px 28px;
+      background: var(--vert);
+      color: var(--noir);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      transition: opacity 0.2s;
+    }
+
+    .btn-primary:hover { opacity: 0.85; }
+
+    .btn-secondary {
+      padding: 14px 28px;
+      background: transparent;
+      color: var(--blanc);
+      border: 1px solid #444;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #222;
+      border-color: var(--orange);
+      color: var(--orange);
+    }
+
+    /* ---- GRILLE DE CARTES QR ---- */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    /* ---- CARTE QR ---- */
+    .qr-card {
+      background: var(--blanc);
+      color: var(--noir);
+      border-radius: 16px;
+      overflow: hidden;
+      position: relative;
+      break-inside: avoid;
+    }
+
+    .qr-card-header {
+      background: var(--noir);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .qr-card-header .fleet-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--vert);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .qr-card-header .vehicle-id {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: #666;
+    }
+
+    .qr-card-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .qr-code-container {
+      background: white;
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      border: 3px solid var(--noir);
+    }
+
+    .vehicle-name {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .vehicle-plaque {
+      font-family: 'Space Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--noir);
+      background: #f0f0f0;
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: 2px solid #ddd;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .qr-card-footer {
+      border-top: 2px dashed #e0e0e0;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: #999;
+    }
+
+    .statut-tag {
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 700;
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    /* ---- BADGE SCAN ---- */
+    .scan-badge {
+      position: absolute;
+      top: 60px;
+      right: -8px;
+      background: var(--orange);
+      color: white;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 1px;
+      padding: 4px 10px;
+      border-radius: 4px 0 0 4px;
+      font-weight: 700;
+    }
+
+    /* ---- LOADING ---- */
+    .loading-state {
+      text-align: center;
+      padding: 80px 20px;
+    }
+
+    .loading-state .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid #222;
+      border-top-color: var(--vert);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-state p {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      color: #666;
+    }
+
+    /* ---- VIDE ---- */
+    .empty-state {
+      text-align: center;
+      padding: 80px 20px;
+      color: #444;
+    }
+
+    .empty-state h2 { font-size: 28px; margin-bottom: 12px; }
+    .empty-state p { font-family: 'Space Mono', monospace; font-size: 12px; color: #666; }
+
+    /* ---- IMPRESSION ---- */
+    @media print {
+      body { background: white; color: black; }
+      header, .actions, .page-title, .page-subtitle { display: none; }
+      .qr-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+      }
+      .qr-card {
+        border: 2px solid #ccc;
+        page-break-inside: avoid;
+      }
+      .qr-card-header { background: #222 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">Fleet<span>App</span> — QR Codes</div>
+    <a href="/admin.html" class="btn-back">← Retour au dashboard</a>
+  </header>
+
+  <div class="content">
+    <h1 class="page-title">QR Codes <span>Véhicules</span></h1>
+    <p class="page-subtitle">
+      // Chaque véhicule a un QR code unique — à imprimer et coller dans l'habitacle
+    </p>
+
+    <div class="actions">
+      <button class="btn-primary" onclick="window.print()">
+        🖨️ Imprimer tous les QR codes
+      </button>
+      <button class="btn-secondary" onclick="chargerVehicules()">
+        🔄 Rafraîchir
+      </button>
+    </div>
+
+    <!-- Contenu dynamique -->
+    <div id="contenu">
+      <div class="loading-state">
+        <div class="spinner"></div>
+        <p>Chargement des véhicules...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // CHARGEMENT ET GÉNÉRATION DES QR CODES
+    // ============================================
+
+    async function chargerVehicules() {
+      document.getElementById('contenu').innerHTML = `
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Chargement des véhicules...</p>
+        </div>
+      `;
+
+      try {
+        const response = await fetch('/api/vehicles');
+        const vehicules = await response.json();
+
+        if (!vehicules || vehicules.length === 0) {
+          document.getElementById('contenu').innerHTML = `
+            <div class="empty-state">
+              <h2>Aucun véhicule</h2>
+              <p>Ajoute des véhicules dans Odoo pour générer leurs QR codes.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Génère la grille de cartes
+        const grid = document.createElement('div');
+        grid.className = 'qr-grid';
+        document.getElementById('contenu').innerHTML = '';
+        document.getElementById('contenu').appendChild(grid);
+
+        // Crée une carte QR pour chaque véhicule
+        vehicules.forEach((vehicule, index) => {
+          const carte = creerCarteQR(vehicule);
+          grid.appendChild(carte);
+
+          // Génère le QR code dans le conteneur dédié
+          // On attend que le DOM soit prêt
+          setTimeout(() => {
+            genererQRCode(vehicule, `qr-${vehicule.id}`);
+          }, index * 50);
+        });
+
+      } catch (error) {
+        document.getElementById('contenu').innerHTML = `
+          <div class="empty-state">
+            <h2>Erreur de connexion</h2>
+            <p>Impossible de charger les véhicules depuis Odoo.</p>
+          </div>
+        `;
+        console.error('Erreur:', error);
+      }
+    }
+
+    // ============================================
+    // CRÉATION D'UNE CARTE QR
+    // ============================================
+
+    function creerCarteQR(vehicule) {
+      const carte = document.createElement('div');
+      carte.className = 'qr-card';
+
+      // Extraire le nom propre (sans le modèle dupliqué)
+      const nomAffiche = vehicule.name || 'Véhicule';
+      const plaque = vehicule.license_plate || 'N/A';
+
+      carte.innerHTML = `
+        <!-- Badge SCAN -->
+        <div class="scan-badge">SCAN ME</div>
+
+        <!-- En-tête sombre -->
+        <div class="qr-card-header">
+          <span class="fleet-label">Fleet App</span>
+          <span class="vehicle-id">#${vehicule.id}</span>
+        </div>
+
+        <!-- Corps de la carte -->
+        <div class="qr-card-body">
+          <!-- Le QR code sera généré ici -->
+          <div class="qr-code-container">
+            <div id="qr-${vehicule.id}"></div>
+          </div>
+
+          <div class="vehicle-name">${nomAffiche}</div>
+          <div class="vehicle-plaque">${plaque}</div>
+        </div>
+
+        <!-- Pied de carte -->
+        <div class="qr-card-footer">
+          <span>Scanne pour prendre ce véhicule</span>
+          <span class="statut-tag">✅ Disponible</span>
+        </div>
+      `;
+
+      return carte;
+    }
+
+    // ============================================
+    // GÉNÉRATION DU QR CODE
+    // ============================================
+    // Le QR code contient un objet JSON avec :
+    // - vehicule_id : l'ID dans Odoo
+    // - plaque : la plaque d'immatriculation
+    // - nom : le nom du véhicule
+    //
+    // Quand le chauffeur scanne, l'app lit ces infos
+    // et associe automatiquement le chauffeur au véhicule
+
+    function genererQRCode(vehicule, containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+
+      // Données encodées dans le QR code
+      const donnees = JSON.stringify({
+        vehicule_id: vehicule.id,
+        plaque: vehicule.license_plate || '',
+        nom: vehicule.name || '',
+        app: 'fleet_tracabilite'  // Pour vérifier que c'est bien notre QR
+      });
+
+      try {
+        new QRCode(container, {
+          text: donnees,
+          width: 180,
+          height: 180,
+          colorDark: '#0d0d0d',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H  // Haute correction d'erreur
+        });
+      } catch (e) {
+        container.innerHTML = '<p style="color:red; font-size:11px;">Erreur QR</p>';
+        console.error('Erreur QR Code:', e);
+      }
+    }
+
+    // ============================================
+    // DÉMARRAGE
+    // ============================================
+
+    // Vérifie que l'admin est connecté
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (!user || !user.isAdmin) {
+      window.location.href = '/login.html';
+    }
+
+    chargerVehicules();
+  </script>
+
+</body>
+</html>

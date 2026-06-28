@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetTrack</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --rouge: #CC0000;
+      --rouge-vif: #FF2222;
+      --noir: #0f0f0f;
+      --blanc: #ffffff;
+      --gris: #888;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--noir);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    /* ── Grille de fond ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(204,0,0,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(204,0,0,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
+
+    /* ── Cercles décoratifs ── */
+    .deco {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .deco-1 {
+      width: 600px; height: 600px;
+      top: -200px; right: -150px;
+      border: 1px solid rgba(204,0,0,0.08);
+      animation: rotate 30s linear infinite;
+    }
+    .deco-2 {
+      width: 400px; height: 400px;
+      top: -100px; right: -50px;
+      border: 1px solid rgba(204,0,0,0.05);
+      animation: rotate 20s linear infinite reverse;
+    }
+    .deco-3 {
+      width: 300px; height: 300px;
+      bottom: -100px; left: -80px;
+      border: 1px solid rgba(204,0,0,0.06);
+      animation: rotate 25s linear infinite;
+    }
+
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* ── Barre rouge gauche ── */
+    .barre-gauche {
+      position: fixed;
+      left: 0; top: 0;
+      width: 4px; height: 100vh;
+      background: linear-gradient(to bottom, var(--rouge), transparent);
+      opacity: 0;
+      animation: fadeIn 1.2s ease 0.3s forwards;
+    }
+
+    /* ── Contenu central ── */
+    .container {
+      text-align: center;
+      z-index: 10;
+      padding: 30px 20px;
+    }
+
+    /* Logo SVG */
+    .logo-wrap {
+      margin-bottom: 40px;
+      opacity: 0;
+      transform: translateY(-20px);
+      animation: slideDown 0.8s ease 0.2s forwards;
+    }
+
+    .logo-wrap svg {
+      width: 280px;
+      max-width: 90vw;
+      filter: drop-shadow(0 4px 30px rgba(204,0,0,0.2));
+    }
+
+    /* Tagline */
+    .tagline {
+      font-size: 12px;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--gris);
+      margin-bottom: 60px;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 0.6s forwards;
+    }
+
+    .tagline span {
+      display: inline-block;
+      width: 30px; height: 1px;
+      background: #333;
+      vertical-align: middle;
+      margin: 0 12px;
+    }
+
+    /* Bouton */
+    .btn-entrer {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 40px;
+      background: transparent;
+      border: 1px solid #333;
+      border-radius: 4px;
+      color: var(--blanc);
+      font-family: 'Bebas Neue', cursive;
+      font-size: 18px;
+      letter-spacing: 3px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 1s forwards;
+    }
+
+    .btn-entrer::before {
+      content: '';
+      position: absolute;
+      left: -100%; top: 0;
+      width: 100%; height: 100%;
+      background: var(--rouge);
+      transition: left 0.3s ease;
+      z-index: -1;
+    }
+
+    .btn-entrer:hover {
+      border-color: var(--rouge);
+      letter-spacing: 4px;
+    }
+
+    .btn-entrer:hover::before { left: 0; }
+
+    .btn-entrer .arrow {
+      font-size: 14px;
+      transition: transform 0.3s;
+    }
+    .btn-entrer:hover .arrow { transform: translateX(4px); }
+
+    /* Version */
+    .version {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      color: #333;
+      letter-spacing: 2px;
+      opacity: 0;
+      animation: fadeIn 1s ease 1.4s forwards;
+      white-space: nowrap;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+    @keyframes slideDown {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      .tagline { font-size: 10px; letter-spacing: 2px; margin-bottom: 40px; }
+      .btn-entrer { padding: 14px 30px; font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Déco -->
+  <div class="barre-gauche"></div>
+  <div class="deco deco-1"></div>
+  <div class="deco deco-2"></div>
+  <div class="deco deco-3"></div>
+
+  <!-- Contenu -->
+  <div class="container">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160">
+        <defs>
+          <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#CC0000"/>
+            <stop offset="100%" style="stop-color:#FF2222"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="6" height="160" rx="3" fill="url(#rg)"/>
+        <g transform="translate(42,30)">
+          <path d="M38 0 C21.4 0 8 13.4 8 30 C8 52.5 38 80 38 80 C38 80 68 52.5 68 30 C68 13.4 54.6 0 38 0 Z" fill="url(#rg)"/>
+          <circle cx="38" cy="30" r="14" fill="#1a1a1a"/>
+          <circle cx="38" cy="30" r="6" fill="#FF2222"/>
+        </g>
+        <text x="138" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="#FFFFFF">Fleet</text>
+        <text x="248" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="url(#rg)">Track</text>
+        <text x="138" y="104" font-family="Courier New,monospace" font-size="12" letter-spacing="3" fill="#444">SUIVI · TRAÇABILITÉ · DISPONIBILITÉ</text>
+      </svg>
+    </div>
+
+    <!-- Tagline -->
+    <div class="tagline">
+      <span></span>
+      Système de gestion de flotte
+      <span></span>
+    </div>
+
+    <!-- Bouton -->
+    <a href="/login.html" class="btn-entrer">
+      ACCÉDER
+      <span class="arrow">→</span>
+    </a>
+
+  </div>
+
+  <!-- Version -->
+  <div class="version">v1.0 &nbsp;·&nbsp; Powered by Odoo 17</div>
+
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetTrack — Connexion</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --rouge: #CC0000;
+      --rouge-vif: #FF2222;
+      --noir: #0f0f0f;
+      --noir-2: #1a1a1a;
+      --blanc: #ffffff;
+      --gris: #888888;
+      --gris-clair: #f5f5f5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--noir);
+      min-height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ---- PARTIE GAUCHE : visuelle ---- */
+    .left-panel {
+      width: 55%;
+      background: var(--noir-2);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 50px;
+      overflow: hidden;
+    }
+
+    /* Grille de fond */
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(204,0,0,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(204,0,0,0.06) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Barre rouge gauche */
+    .left-panel::after {
+      content: '';
+      position: absolute;
+      left: 0; top: 0;
+      width: 5px; height: 100%;
+      background: linear-gradient(to bottom, var(--rouge), var(--rouge-vif));
+    }
+
+    .logo-area {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo-svg {
+      width: 280px;
+      filter: drop-shadow(0 4px 20px rgba(204,0,0,0.3));
+    }
+
+    .hero-text {
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-text h1 {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 72px;
+      line-height: 0.9;
+      color: var(--blanc);
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+
+    .hero-text h1 span {
+      color: var(--rouge);
+      display: block;
+    }
+
+    .hero-text p {
+      font-size: 15px;
+      color: var(--gris);
+      line-height: 1.7;
+      max-width: 380px;
+      letter-spacing: 0.3px;
+    }
+
+    .features {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      gap: 30px;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .feature-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--rouge);
+      flex-shrink: 0;
+    }
+
+    /* Cercle décoratif */
+    .deco-circle {
+      position: absolute;
+      right: -80px; top: 50%;
+      transform: translateY(-50%);
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      border: 1px solid rgba(204,0,0,0.12);
+      pointer-events: none;
+    }
+
+    .deco-circle::after {
+      content: '';
+      position: absolute;
+      inset: 40px;
+      border-radius: 50%;
+      border: 1px solid rgba(204,0,0,0.08);
+    }
+
+    /* ---- PARTIE DROITE : formulaire ---- */
+    .right-panel {
+      width: 45%;
+      background: var(--blanc);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 50px;
+      position: relative;
+    }
+
+    .form-container {
+      width: 100%;
+      max-width: 380px;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .form-header {
+      margin-bottom: 40px;
+    }
+
+    .form-header .eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--rouge);
+      margin-bottom: 10px;
+    }
+
+    .form-header h2 {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 42px;
+      letter-spacing: 1px;
+      color: var(--noir);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .form-header p {
+      font-size: 14px;
+      color: var(--gris);
+    }
+
+    /* Champs */
+    .field {
+      margin-bottom: 20px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #333;
+      margin-bottom: 8px;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #e8e8e8;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      color: var(--noir);
+      background: white;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    .field input:focus {
+      border-color: var(--rouge);
+    }
+
+    .field input::placeholder { color: #bbb; }
+
+
+
+    /* Bouton connexion */
+    .btn-connexion {
+      width: 100%;
+      padding: 16px;
+      background: var(--rouge);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Bebas Neue', cursive;
+      font-size: 20px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .btn-connexion:hover {
+      background: var(--rouge-vif);
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px rgba(204,0,0,0.3);
+    }
+
+    .btn-connexion:active { transform: translateY(0); }
+
+    .btn-connexion.loading {
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    /* Erreur */
+    .error-msg {
+      display: none;
+      background: #fff0f0;
+      border: 1px solid #ffcccc;
+      border-left: 3px solid var(--rouge);
+      color: var(--rouge);
+      padding: 12px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 14px;
+    }
+
+    .error-msg.show { display: block; }
+
+    /* Footer */
+    .form-footer {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      text-align: center;
+      font-size: 12px;
+      color: #bbb;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .left-panel { display: none; }
+      .right-panel { width: 100%; padding: 40px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- GAUCHE -->
+  <div class="left-panel">
+    <div class="deco-circle"></div>
+
+    <div class="logo-area">
+      <svg class="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160">
+        <defs>
+          <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#CC0000"/>
+            <stop offset="100%" style="stop-color:#FF2222"/>
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="6" height="160" rx="3" fill="url(#rg)"/>
+        <g transform="translate(42,30)">
+          <path d="M38 0 C21.4 0 8 13.4 8 30 C8 52.5 38 80 38 80 C38 80 68 52.5 68 30 C68 13.4 54.6 0 38 0 Z" fill="url(#rg)"/>
+          <circle cx="38" cy="30" r="14" fill="#1a1a1a"/>
+          <circle cx="38" cy="30" r="6" fill="#FF2222"/>
+        </g>
+        <text x="138" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="#FFFFFF">Fleet</text>
+        <text x="248" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="url(#rg)">Track</text>
+        <text x="138" y="100" font-family="Courier New,monospace" font-size="13" letter-spacing="3" fill="#888">SUIVI · TRAÇABILITÉ · DISPONIBILITÉ</text>
+      </svg>
+    </div>
+
+    <div class="hero-text">
+      <h1>GESTION<span>INTELLIGENTE</span>DE FLOTTE</h1>
+      <p>Suivez vos véhicules en temps réel, gérez vos chauffeurs et optimisez vos missions depuis une seule plateforme.</p>
+    </div>
+
+    <div class="features">
+      <div class="feature"><div class="feature-dot"></div>GPS temps réel</div>
+      <div class="feature"><div class="feature-dot"></div>Gestion missions</div>
+      <div class="feature"><div class="feature-dot"></div>QR Code</div>
+    </div>
+  </div>
+
+  <!-- DROITE -->
+  <div class="right-panel">
+    <div class="form-container">
+      <div class="form-header">
+        <div class="eyebrow">Bienvenue</div>
+        <h2>CONNEXION</h2>
+        <p>Accédez à votre espace de gestion</p>
+      </div>
+
+
+      <!-- Formulaire -->
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="votre@email.com"
+               onkeypress="if(event.key==='Enter') seConnecter()">
+      </div>
+
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="password" placeholder="••••••••"
+               onkeypress="if(event.key==='Enter') seConnecter()">
+      </div>
+
+      <button class="btn-connexion" onclick="seConnecter()" id="btnLogin">
+        SE CONNECTER
+      </button>
+
+      <div class="error-msg" id="errorMsg"></div>
+
+      <div class="form-footer">
+        FleetTrack v1.0 — Powered by Odoo
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+async function seConnecter() {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn      = document.getElementById('btnLogin');
+  const erreur   = document.getElementById('errorMsg');
+
+  if (!email || !password) {
+    afficherErreur('Remplis tous les champs.');
+    return;
+  }
+
+  btn.textContent = 'CONNEXION EN COURS...';
+  btn.classList.add('loading');
+  erreur.classList.remove('show');
+
+  try {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      btn.textContent = '✓ CONNECTÉ !';
+      btn.style.background = '#00aa44';
+
+      // Redirection basée sur l'email et le profil Odoo
+      setTimeout(() => {
+        const emailSaisi = email.toLowerCase();
+
+        // Priorité 1 : isAdmin retourné par Odoo
+        if (data.user.isAdmin) {
+          window.location.href = '/admin.html';
+          return;
+        }
+
+        // Priorité 2 : si l'email contient "admin" → admin
+        if (emailSaisi.includes('admin')) {
+          window.location.href = '/admin.html';
+          return;
+        }
+
+        // Par défaut → chauffeur
+        window.location.href = '/driver.html';
+
+      }, 600);
+
+    } else {
+      afficherErreur(data.message || 'Email ou mot de passe incorrect.');
+      btn.textContent = 'SE CONNECTER';
+      btn.classList.remove('loading');
+    }
+
+  } catch (e) {
+    afficherErreur('Erreur de connexion au serveur.');
+    btn.textContent = 'SE CONNECTER';
+    btn.classList.remove('loading');
+  }
+}
+
+    function afficherErreur(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+
+    // Vérifie si déjà connecté
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (user) {
+      window.location.href = user.isAdmin ? '/admin.html' : '/driver.html';
+    }
+  </script>
+
+</body>
+</html>

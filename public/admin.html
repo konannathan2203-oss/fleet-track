@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetTrack — Dashboard Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      --rouge: #CC0000;
+      --rouge-vif: #FF2222;
+      --noir: #0f0f0f;
+      --noir-2: #1a1a1a;
+      --noir-3: #242424;
+      --blanc: #ffffff;
+      --gris: #888;
+      --gris-clair: #f5f5f5;
+      --sidebar: 240px;
+    }
+ 
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--gris-clair);
+      display: flex;
+      min-height: 100vh;
+    }
+ 
+    /* ================================
+       OVERLAY MOBILE (NOUVEAU)
+    ================================ */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 99;
+    }
+    .sidebar-overlay.active { display: block; }
+ 
+    /* ================================
+       SIDEBAR
+    ================================ */
+    .sidebar {
+      width: var(--sidebar);
+      background: var(--noir);
+      height: 100vh;
+      position: fixed;
+      left: 0; top: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #222;
+      z-index: 100;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+ 
+    .sidebar-logo {
+      padding: 24px 20px;
+      border-bottom: 1px solid #222;
+    }
+ 
+    .sidebar-logo svg { width: 160px; }
+ 
+    .sidebar-user {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+ 
+    .user-avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: var(--rouge);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+      flex-shrink: 0;
+    }
+ 
+    .user-info p { font-size: 13px; color: white; font-weight: 500; }
+    .user-info span { font-size: 11px; color: #555; }
+ 
+    .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+ 
+    .nav-section {
+      padding: 8px 20px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #444;
+      margin-top: 8px;
+    }
+ 
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      user-select: none;
+    }
+ 
+    .nav-item:hover { background: #1a1a1a; color: #999; }
+ 
+    .nav-item.active {
+      background: #1a1a1a;
+      color: var(--blanc);
+      border-left-color: var(--rouge);
+    }
+ 
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+ 
+    .sidebar-bottom {
+      padding: 16px;
+      border-top: 1px solid #1a1a1a;
+    }
+ 
+    .btn-logout {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #555;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+ 
+    .btn-logout:hover { border-color: var(--rouge); color: var(--rouge); }
+ 
+    /* ================================
+       MAIN
+    ================================ */
+    .main {
+      margin-left: var(--sidebar);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+ 
+    /* Topbar */
+    .topbar {
+      background: white;
+      padding: 0 30px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #eee;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+ 
+    /* BOUTON HAMBURGER (NOUVEAU) */
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+ 
+    .btn-hamburger {
+      display: none;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      flex-direction: column;
+      gap: 5px;
+      transition: background 0.2s;
+    }
+    .btn-hamburger:hover { background: #f0f0f0; }
+    .btn-hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--noir);
+      border-radius: 2px;
+      transition: all 0.3s;
+    }
+ 
+    .topbar-title { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 1px; color: var(--noir); }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+ 
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--gris);
+    }
+ 
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4CAF50;
+      animation: pulse 2s infinite;
+    }
+ 
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+ 
+    /* Contenu pages */
+    .page { display: none; padding: 30px; }
+    .page.active { display: block; }
+ 
+    /* ================================
+       STATS CARDS
+    ================================ */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+ 
+    .stat-card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      border-bottom: 3px solid;
+    }
+ 
+    .stat-card.disponible  { border-color: #22c55e; }
+    .stat-card.mission     { border-color: var(--rouge); }
+    .stat-card.maintenance { border-color: #f59e0b; }
+    .stat-card.hors        { border-color: #6b7280; }
+ 
+    .stat-label { font-size: 12px; color: var(--gris); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-value { font-family: 'Bebas Neue', cursive; font-size: 40px; letter-spacing: 1px; color: var(--noir); line-height: 1; }
+    .stat-icon  { font-size: 32px; opacity: 0.25; }
+ 
+    /* ================================
+       SECTION CARD
+    ================================ */
+    .section-card {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+ 
+    .section-head {
+      padding: 16px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+ 
+    .section-head h2 {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 18px;
+      letter-spacing: 1px;
+      color: var(--noir);
+    }
+ 
+    .section-head .actions { display: flex; gap: 8px; }
+ 
+    /* Boutons */
+    .btn {
+      padding: 9px 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+ 
+    .btn-primary { background: var(--rouge); color: white; }
+    .btn-primary:hover { background: var(--rouge-vif); }
+    .btn-secondary { background: #f5f5f5; color: #333; border: 1px solid #e0e0e0; }
+    .btn-secondary:hover { background: #eee; }
+    .btn-danger { background: #fff0f0; color: var(--rouge); border: 1px solid #ffcccc; }
+    .btn-danger:hover { background: #ffe0e0; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+ 
+    /* Tableau */
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+ 
+    table { width: 100%; border-collapse: collapse; }
+ 
+    thead th {
+      background: #fafafa;
+      padding: 11px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #999;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+    }
+ 
+    tbody td {
+      padding: 13px 16px;
+      font-size: 14px;
+      color: #333;
+      border-bottom: 1px solid #f9f9f9;
+    }
+ 
+    tbody tr:hover td { background: #fafafa; }
+    tbody tr:last-child td { border-bottom: none; }
+ 
+    .td-actions { display: flex; gap: 6px; }
+ 
+    /* Badges statut */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+ 
+    .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+ 
+    .badge.disponible  { background: #f0fdf4; color: #16a34a; }
+    .badge.disponible::before  { background: #16a34a; }
+    .badge.en_mission  { background: #fff0f0; color: var(--rouge); }
+    .badge.en_mission::before  { background: var(--rouge); }
+    .badge.maintenance { background: #fffbeb; color: #d97706; }
+    .badge.maintenance::before { background: #d97706; }
+    .badge.hors_service{ background: #f9fafb; color: #6b7280; }
+    .badge.hors_service::before{ background: #6b7280; }
+    .badge.occupe      { background: #fff7ed; color: #ea580c; }
+    .badge.occupe::before{ background: #ea580c; }
+    .badge.actif       { background: #f0fdf4; color: #16a34a; }
+    .badge.actif::before { background: #16a34a; }
+    .badge.inactif     { background: #f9fafb; color: #6b7280; }
+    .badge.inactif::before { background: #6b7280; }
+ 
+    /* Vide */
+    .empty-row td { text-align: center; color: #bbb; padding: 40px; font-size: 14px; }
+ 
+    /* ================================
+       MODAL
+    ================================ */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+ 
+    .modal-overlay.open { display: flex; }
+ 
+    .modal {
+      background: white;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: modalIn 0.2s ease;
+    }
+ 
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+ 
+    .modal-head {
+      padding: 20px 24px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+ 
+    .modal-head h3 {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: var(--noir);
+    }
+ 
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: #999;
+      line-height: 1;
+    }
+ 
+    .modal-close:hover { color: var(--rouge); }
+ 
+    .modal-body { padding: 24px; }
+ 
+    .form-field { margin-bottom: 18px; }
+ 
+    .form-field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 6px;
+    }
+ 
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 6px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      background: white;
+    }
+ 
+    .form-field input:focus,
+    .form-field select:focus,
+    .form-field textarea:focus { border-color: var(--rouge); }
+ 
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+ 
+    .modal-foot {
+      padding: 16px 24px;
+      border-top: 1px solid #f0f0f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+ 
+    /* ================================
+       CARTE GPS
+    ================================ */
+    #map-admin {
+      height: 450px;
+      border-radius: 8px;
+    }
+ 
+    .map-legend {
+      display: flex;
+      gap: 20px;
+      padding: 12px 20px;
+      border-top: 1px solid #f0f0f0;
+      font-size: 12px;
+      color: var(--gris);
+    }
+ 
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+ 
+    /* Notification */
+    .notif {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 2000;
+      opacity: 0;
+      transform: translateX(20px);
+      transition: all 0.3s;
+      pointer-events: none;
+      max-width: calc(100vw - 40px);
+    }
+ 
+    .notif.show { opacity: 1; transform: translateX(0); }
+    .notif.success { background: var(--noir); color: white; border-left: 3px solid #22c55e; }
+    .notif.error   { background: var(--noir); color: white; border-left: 3px solid var(--rouge); }
+    .notif.info    { background: var(--noir); color: white; border-left: 3px solid #3b82f6; }
+ 
+    /* Loading */
+    .loading-row td { text-align: center; padding: 30px; color: #bbb; }
+ 
+    /* Grille 2 colonnes */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+ 
+    /* ================================
+       RESPONSIVE (NOUVEAU)
+    ================================ */
+ 
+    /* Tablette */
+    @media (max-width: 1024px) and (min-width: 769px) {
+      :root { --sidebar: 200px; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .page { padding: 20px; }
+    }
+ 
+    /* Mobile */
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+      }
+      .main { margin-left: 0; }
+      .btn-hamburger { display: flex; }
+      .topbar { padding: 0 16px; }
+      .topbar-title { font-size: 18px; }
+      .live-indicator span { display: none; }
+      .page { padding: 14px; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+      .stat-card { padding: 14px 12px; }
+      .stat-value { font-size: 30px; }
+      .stat-icon { font-size: 24px; }
+      .grid-2 { grid-template-columns: 1fr; gap: 14px; }
+      #map-admin { height: 300px; }
+      .section-head { flex-wrap: wrap; gap: 10px; }
+      .form-row { grid-template-columns: 1fr; }
+      .td-actions { flex-wrap: wrap; }
+    }
+ 
+    /* Petit mobile */
+    @media (max-width: 480px) {
+      .stats-row { gap: 8px; }
+      .stat-card { padding: 12px 10px; }
+      .stat-value { font-size: 26px; }
+      .stat-label { font-size: 10px; }
+      .stat-icon { font-size: 20px; }
+      .topbar-title { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+ 
+<!-- NOTIFICATION -->
+<div class="notif" id="notif"></div>
+ 
+<!-- OVERLAY MOBILE (NOUVEAU) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="fermerSidebar()"></div>
+ 
+<!-- MODAL VÉHICULE -->
+<div class="modal-overlay" id="modalVehicule">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalVehiculeTitle">AJOUTER UN VÉHICULE</h3>
+      <button class="modal-close" onclick="fermerModal('modalVehicule')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="vehiculeEditId">
+      <div class="form-row">
+        <div class="form-field">
+          <label>Marque</label>
+          <input type="text" id="v_marque" placeholder="Ex: Toyota">
+        </div>
+        <div class="form-field">
+          <label>Modèle</label>
+          <input type="text" id="v_modele" placeholder="Ex: Corolla">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Plaque d'immatriculation</label>
+        <input type="text" id="v_plaque" placeholder="Ex: ABJ 123">
+      </div>
+      <div class="form-field">
+        <label>Statut</label>
+        <select id="v_statut">
+          <option value="disponible">✅ Disponible</option>
+          <option value="en_mission">🚀 En mission</option>
+          <option value="maintenance">🔧 Maintenance</option>
+          <option value="hors_service">⛔ Hors service</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="fermerModal('modalVehicule')">Annuler</button>
+      <button class="btn btn-primary" onclick="sauvegarderVehicule()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- MODAL CHAUFFEUR -->
+<div class="modal-overlay" id="modalChauffeur">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalChauffeurTitle">AJOUTER UN CHAUFFEUR</h3>
+      <button class="modal-close" onclick="fermerModal('modalChauffeur')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="chauffeurEditId">
+      <div class="form-row">
+        <div class="form-field">
+          <label>Prénom</label>
+          <input type="text" id="c_prenom" placeholder="Jean">
+        </div>
+        <div class="form-field">
+          <label>Nom</label>
+          <input type="text" id="c_nom" placeholder="Kouassi">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Email (pour connexion)</label>
+        <input type="email" id="c_email" placeholder="jean.kouassi@email.com">
+      </div>
+      <div class="form-field">
+        <label>Téléphone</label>
+        <input type="text" id="c_tel" placeholder="+225 07 00 00 00">
+      </div>
+      <div class="form-field">
+        <label>Mot de passe</label>
+        <input type="password" id="c_password" placeholder="••••••••">
+      </div>
+      <div class="form-field">
+        <label>Statut</label>
+        <select id="c_statut">
+          <option value="actif">Actif</option>
+          <option value="inactif">Inactif</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="fermerModal('modalChauffeur')">Annuler</button>
+      <button class="btn btn-primary" onclick="sauvegarderChauffeur()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- MODAL MISSION -->
+<div class="modal-overlay" id="modalMission">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>CRÉER UNE MISSION</h3>
+      <button class="modal-close" onclick="fermerModal('modalMission')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Véhicule</label>
+        <select id="m_vehicule"></select>
+      </div>
+      <div class="form-field">
+        <label>Chauffeur</label>
+        <select id="m_chauffeur"></select>
+      </div>
+      <div class="form-field">
+        <label>Destination</label>
+        <input type="text" id="m_destination" placeholder="Ex: Plateau, Abidjan">
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Date début</label>
+          <input type="datetime-local" id="m_debut">
+        </div>
+        <div class="form-field">
+          <label>Date fin prévue</label>
+          <input type="datetime-local" id="m_fin">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="fermerModal('modalMission')">Annuler</button>
+      <button class="btn btn-primary" onclick="sauvegarderMission()">Créer la mission</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- MODAL HISTORIQUE -->
+<div class="modal-overlay" id="modalHistorique">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-head">
+      <h3 id="modalHistoriqueTitle">HISTORIQUE</h3>
+      <button class="modal-close" onclick="fermerModal('modalHistorique')">×</button>
+    </div>
+    <div class="modal-body" id="modalHistoriqueBody">
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="fermerModal('modalHistorique')">Fermer</button>
+    </div>
+  </div>
+</div>
+ 
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160">
+      <defs>
+        <linearGradient id="rg2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#CC0000"/>
+          <stop offset="100%" style="stop-color:#FF2222"/>
+        </linearGradient>
+      </defs>
+      <rect x="0" y="0" width="6" height="160" rx="3" fill="url(#rg2)"/>
+      <g transform="translate(42,30)">
+        <path d="M38 0 C21.4 0 8 13.4 8 30 C8 52.5 38 80 38 80 C38 80 68 52.5 68 30 C68 13.4 54.6 0 38 0 Z" fill="url(#rg2)"/>
+        <circle cx="38" cy="30" r="14" fill="#1a1a1a"/>
+        <circle cx="38" cy="30" r="6" fill="#FF2222"/>
+      </g>
+      <text x="138" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="#FFFFFF">Fleet</text>
+      <text x="248" y="72" font-family="Georgia,serif" font-size="46" font-weight="700" fill="url(#rg2)">Track</text>
+    </svg>
+  </div>
+ 
+  <div class="sidebar-user">
+    <div class="user-avatar" id="userAvatar">A</div>
+    <div class="user-info">
+      <p id="userName">Administrateur</p>
+      <span>Admin</span>
+    </div>
+  </div>
+ 
+  <nav class="sidebar-nav">
+    <div class="nav-section">Principal</div>
+    <div class="nav-item active" onclick="afficherPage('dashboard')">
+      <span class="icon"></span> Dashboard
+    </div>
+    <div class="nav-item" onclick="afficherPage('carte')">
+      <span class="icon"></span> Carte en direct
+    </div>
+ 
+    <div class="nav-section">Gestion</div>
+    <div class="nav-item" onclick="afficherPage('vehicules')">
+      <span class="icon"></span> Véhicules
+    </div>
+    <div class="nav-item" onclick="afficherPage('chauffeurs')">
+      <span class="icon"></span> Chauffeurs
+    </div>
+    <div class="nav-item" onclick="afficherPage('missions')">
+      <span class="icon"></span> Missions
+    </div>
+ 
+    <div class="nav-section">Outils</div>
+    <div class="nav-item" onclick="window.location.href='/qrcodes.html'">
+      <span class="icon"></span> QR Codes
+    </div>
+  </nav>
+ 
+  <div class="sidebar-bottom">
+    <button class="btn-logout" onclick="seDeconnecter()">
+      🚪 Déconnexion
+    </button>
+  </div>
+</aside>
+ 
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <!-- TOPBAR LEFT avec hamburger (NOUVEAU) -->
+    <div class="topbar-left">
+      <button class="btn-hamburger" id="btnHamburger" onclick="toggleSidebar()" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="topbar-title" id="topbarTitle">DASHBOARD</div>
+    </div>
+    <div class="topbar-right">
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span id="vehiculesEnDirectCount">0 véhicule(s) en direct</span>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ========================
+       PAGE : DASHBOARD
+  ======================== -->
+  <div class="page active" id="page-dashboard">
+    <div class="stats-row">
+      <div class="stat-card disponible">
+        <div>
+          <div class="stat-label">Disponibles</div>
+          <div class="stat-value" id="s-disponible">—</div>
+        </div>
+        <div class="stat-icon">✅</div>
+      </div>
+      <div class="stat-card mission">
+        <div>
+          <div class="stat-label">En mission</div>
+          <div class="stat-value" id="s-mission">—</div>
+        </div>
+        <div class="stat-icon">🚀</div>
+      </div>
+      <div class="stat-card maintenance">
+        <div>
+          <div class="stat-label">Maintenance</div>
+          <div class="stat-value" id="s-maintenance">—</div>
+        </div>
+        <div class="stat-icon">🔧</div>
+      </div>
+      <div class="stat-card hors">
+        <div>
+          <div class="stat-label">Hors service</div>
+          <div class="stat-value" id="s-hors">—</div>
+        </div>
+        <div class="stat-icon">⛔</div>
+      </div>
+    </div>
+ 
+    <div class="grid-2">
+      <!-- Véhicules récents -->
+      <div class="section-card">
+        <div class="section-head">
+          <h2>VÉHICULES</h2>
+          <button class="btn btn-sm btn-primary" onclick="afficherPage('vehicules')">Voir tout</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Véhicule</th><th>Plaque</th><th>Statut</th></tr></thead>
+            <tbody id="dashVehicules"><tr class="loading-row"><td colspan="3">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+ 
+      <!-- Missions récentes -->
+      <div class="section-card">
+        <div class="section-head">
+          <h2>MISSIONS RÉCENTES</h2>
+          <button class="btn btn-sm btn-primary" onclick="afficherPage('missions')">Voir tout</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mission</th><th>Destination</th><th>Statut</th></tr></thead>
+            <tbody id="dashMissions"><tr class="loading-row"><td colspan="3">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ========================
+       PAGE : CARTE
+  ======================== -->
+  <div class="page" id="page-carte">
+    <div class="section-card">
+      <div class="section-head">
+        <h2>🗺️ CARTE EN DIRECT</h2>
+        <div class="live-indicator">
+          <div class="live-dot"></div>
+          <span id="carteVehiculeCount">0 véhicule(s) tracé(s)</span>
+        </div>
+      </div>
+      <div id="map-admin"></div>
+      <div class="map-legend">
+        <div class="legend-item">🚗 Véhicule en mission</div>
+        <div class="legend-item">📍 Position actuelle</div>
+        <div class="legend-item">🔴 Dernière mise à jour</div>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ========================
+       PAGE : VÉHICULES
+  ======================== -->
+  <div class="page" id="page-vehicules">
+    <div class="section-card">
+      <div class="section-head">
+        <h2>GESTION DES VÉHICULES</h2>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="chargerVehicules()">🔄 Actualiser</button>
+          <button class="btn btn-primary" onclick="ouvrirModalVehicule()">+ Ajouter</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Véhicule</th>
+              <th>Plaque</th>
+              <th>Conducteur</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableVehicules">
+            <tr class="loading-row"><td colspan="5">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ========================
+       PAGE : CHAUFFEURS
+  ======================== -->
+  <div class="page" id="page-chauffeurs">
+    <div class="section-card">
+      <div class="section-head">
+        <h2>GESTION DES CHAUFFEURS</h2>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="chargerChauffeurs()">🔄 Actualiser</button>
+          <button class="btn btn-primary" onclick="ouvrirModalChauffeur()">+ Ajouter</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Email</th>
+              <th>Téléphone</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableChauffeurs">
+            <tr class="loading-row"><td colspan="5">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+  <!-- ========================
+       PAGE : MISSIONS
+  ======================== -->
+  <div class="page" id="page-missions">
+    <div class="section-card">
+      <div class="section-head">
+        <h2>GESTION DES MISSIONS</h2>
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="chargerMissions()">🔄 Actualiser</button>
+          <button class="btn btn-primary" onclick="ouvrirModalMission()">+ Créer</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Référence</th>
+              <th>Véhicule</th>
+              <th>Chauffeur</th>
+              <th>Destination</th>
+              <th>Début</th>
+              <th>Statut</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableMissions">
+            <tr class="loading-row"><td colspan="7">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+ 
+</main>
+ 
+<script>
+// ================================================
+// ÉTAT & CONFIG
+// ================================================
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+if (!user || !user.isAdmin) window.location.href = '/login.html';
+ 
+document.getElementById('userName').textContent  = user?.name || 'Admin';
+document.getElementById('userAvatar').textContent = (user?.name || 'A')[0].toUpperCase();
+ 
+const socket = io();
+const marqueursCarte = {};
+let carteAdmin = null;
+let vehiculesCache = [];
+let chauffeursCache = [];
+ 
+// ================================================
+// HAMBURGER — SIDEBAR MOBILE (NOUVEAU)
+// ================================================
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const isOpen  = sidebar.classList.contains('open');
+  if (isOpen) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+  } else {
+    sidebar.classList.add('open');
+    overlay.classList.add('active');
+  }
+}
+ 
+function fermerSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
+}
+ 
+// ================================================
+// NAVIGATION
+// ================================================
+const titres = {
+  dashboard: 'DASHBOARD',
+  carte: 'CARTE EN DIRECT',
+  vehicules: 'VÉHICULES',
+  chauffeurs: 'CHAUFFEURS',
+  missions: 'MISSIONS'
+};
+ 
+function afficherPage(nom) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+ 
+  document.getElementById('page-' + nom).classList.add('active');
+  document.getElementById('topbarTitle').textContent = titres[nom] || nom.toUpperCase();
+ 
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.textContent.trim().toLowerCase().includes(nom === 'dashboard' ? 'dashboard'
+      : nom === 'carte' ? 'direct' : nom === 'vehicules' ? 'véhicules'
+      : nom === 'chauffeurs' ? 'chauffeurs' : 'missions')) {
+      n.classList.add('active');
+    }
+  });
+ 
+  if (nom === 'dashboard') { chargerVehicules(); chargerMissions(); }
+  if (nom === 'vehicules')  chargerVehicules();
+  if (nom === 'chauffeurs') chargerChauffeurs();
+  if (nom === 'missions')   chargerMissions();
+  if (nom === 'carte')      initialiserCarte();
+ 
+  // Ferme la sidebar sur mobile après navigation (NOUVEAU)
+  fermerSidebar();
+}
+ 
+// ================================================
+// VÉHICULES
+// ================================================
+function badgeStatutChauffeur(c) {
+  if (!c.active) return '<span class="badge inactif">Inactif</span>';
+
+  // Cherche une mission en cours dont la note contient le nom du chauffeur
+  const nomChauffeur = c.name?.toLowerCase() || '';
+  const enMission = window._missionsEnCours?.some(m =>
+    m.note && m.note.toLowerCase().includes(nomChauffeur) && m.statut === 'en_cours'
+  );
+
+  if (enMission) return '<span class="badge en_mission">🚀 En mission</span>';
+  return '<span class="badge actif">Disponible</span>';
+}
+
+async function chargerVehicules() {
+  try {
+    const r = await fetch('/api/vehicles');
+    vehiculesCache = await r.json();
+ 
+    const stats = { disponible:0, en_mission:0, maintenance:0, hors_service:0, occupe:0 };
+    vehiculesCache.forEach(v => {
+      if(stats[v.statut] !== undefined) stats[v.statut]++;
+      else if(!v.statut) stats.disponible++;
+    });
+    document.getElementById('s-disponible').textContent  = stats.disponible;
+    document.getElementById('s-mission').textContent     = stats.en_mission + stats.occupe;
+    document.getElementById('s-maintenance').textContent = stats.maintenance;
+    document.getElementById('s-hors').textContent        = stats.hors_service;
+ 
+    const dash = document.getElementById('dashVehicules');
+    dash.innerHTML = vehiculesCache.slice(0,5).map(v => `
+      <tr>
+        <td>${v.name}</td>
+        <td><code style="font-size:12px;background:#f5f5f5;padding:2px 6px;border-radius:4px">${v.license_plate||'—'}</code></td>
+        <td>${badgeStatut(v.statut)}</td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="3">Aucun véhicule</td></tr>';
+ 
+    const tbl = document.getElementById('tableVehicules');
+    if (tbl) {
+      tbl.innerHTML = vehiculesCache.map(v => `
+        <tr>
+          <td><strong>${v.name}</strong></td>
+          <td><code style="font-size:12px;background:#f5f5f5;padding:2px 6px;border-radius:4px">${v.license_plate||'—'}</code></td>
+          <td>${v.driver_id ? v.driver_id[1] : '<span style="color:#bbb">Non assigné</span>'}</td>
+          <td>${badgeStatut(v.statut)}</td>
+          <td>
+            <div class="td-actions">
+              <button class="btn btn-sm btn-secondary" onclick="modifierVehicule(${v.id})">✏️ Modifier</button>
+              <button class="btn btn-sm btn-secondary" onclick="voirHistoriqueVehicule(${v.id},'${v.name}')">📋 Historique</button>
+              <button class="btn btn-sm btn-danger" onclick="supprimerVehicule(${v.id})">🗑️</button>
+            </div>
+          </td>
+        </tr>`).join('') || '<tr class="empty-row"><td colspan="5">Aucun véhicule enregistré</td></tr>';
+    }
+ 
+  } catch(e) { notif('Erreur chargement véhicules','error'); }
+}
+ 
+function ouvrirModalVehicule(id) {
+  document.getElementById('vehiculeEditId').value = '';
+  document.getElementById('modalVehiculeTitle').textContent = 'AJOUTER UN VÉHICULE';
+  document.getElementById('v_marque').value  = '';
+  document.getElementById('v_modele').value  = '';
+  document.getElementById('v_plaque').value  = '';
+  document.getElementById('v_statut').value  = 'disponible';
+  ouvrirModal('modalVehicule');
+}
+ 
+function modifierVehicule(id) {
+  const v = vehiculesCache.find(x => x.id === id);
+  if (!v) return;
+  document.getElementById('vehiculeEditId').value = id;
+  document.getElementById('modalVehiculeTitle').textContent = 'MODIFIER LE VÉHICULE';
+  const parts = (v.name || '').split('/');
+  document.getElementById('v_marque').value = parts[0] || '';
+  document.getElementById('v_modele').value = parts[1] || '';
+  document.getElementById('v_plaque').value = v.license_plate || '';
+  document.getElementById('v_statut').value = v.statut || 'disponible';
+  ouvrirModal('modalVehicule');
+}
+ 
+async function sauvegarderVehicule() {
+  const id     = document.getElementById('vehiculeEditId').value;
+  const marque = document.getElementById('v_marque').value.trim();
+  const modele = document.getElementById('v_modele').value.trim();
+  const plaque = document.getElementById('v_plaque').value.trim();
+  const statut = document.getElementById('v_statut').value;
+  if (!plaque) { notif('La plaque est obligatoire','error'); return; }
+  const nom = marque && modele ? `${marque}/${modele}` : marque || modele || 'Véhicule';
+  try {
+    if (id) {
+      await fetch(`/api/vehicles/${id}/update`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:nom, license_plate:plaque, statut }) });
+      notif('Véhicule modifié ✓','success');
+    } else {
+      await fetch('/api/vehicles', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:nom, license_plate:plaque, statut }) });
+      notif('Véhicule ajouté ✓','success');
+    }
+    fermerModal('modalVehicule');
+    chargerVehicules();
+  } catch(e) { notif('Erreur sauvegarde','error'); }
+}
+ 
+async function supprimerVehicule(id) {
+  const v = vehiculesCache.find(x => x.id === id);
+  if (!confirm(`Supprimer "${v?.name}" ?`)) return;
+  try {
+    await fetch(`/api/vehicles/${id}`, { method:'DELETE' });
+    notif('Véhicule supprimé','success');
+    chargerVehicules();
+  } catch(e) { notif('Erreur suppression','error'); }
+}
+ 
+async function voirHistoriqueVehicule(id, nom) {
+  document.getElementById('modalHistoriqueTitle').textContent = `HISTORIQUE — ${nom}`;
+  document.getElementById('modalHistoriqueBody').innerHTML = '<p style="color:#bbb;text-align:center;padding:20px">Chargement...</p>';
+  ouvrirModal('modalHistorique');
+  try {
+    const r = await fetch(`/api/vehicles/${id}/missions`);
+    const missions = await r.json();
+    if (!missions.length) {
+      document.getElementById('modalHistoriqueBody').innerHTML = '<p style="color:#bbb;text-align:center;padding:20px">Aucune mission enregistrée</p>';
+      return;
+    }
+    document.getElementById('modalHistoriqueBody').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#fafafa">
+          <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">MISSION</th>
+          <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">DESTINATION</th>
+          <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">DATE</th>
+          <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">STATUT</th>
+        </tr></thead>
+        <tbody>${missions.map(m => `
+          <tr style="border-top:1px solid #f5f5f5">
+            <td style="padding:10px 8px">${m.name}</td>
+            <td style="padding:10px 8px">${m.destination||'—'}</td>
+            <td style="padding:10px 8px;font-size:12px;color:#888">${m.heure_debut ? m.heure_debut.split(' ')[0] : '—'}</td>
+            <td style="padding:10px 8px">${badgeMission(m.statut)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) {
+    document.getElementById('modalHistoriqueBody').innerHTML = '<p style="color:red;text-align:center;padding:20px">Erreur de chargement</p>';
+  }
+}
+ 
+// ================================================
+// CHAUFFEURS
+// ================================================
+async function chargerChauffeurs() {
+  try {
+    const r = await fetch('/api/chauffeurs');
+    chauffeursCache = await r.json();
+    const tbl = document.getElementById('tableChauffeurs');
+    if (!tbl) return;
+    if (!chauffeursCache.length) {
+      tbl.innerHTML = '<tr class="empty-row"><td colspan="5">Aucun chauffeur enregistré</td></tr>';
+      return;
+    }
+    tbl.innerHTML = chauffeursCache.map(c => `
+      <tr>
+        <td><strong>${c.name}</strong></td>
+        <td>${c.email || '—'}</td>
+        <td>${c.phone || '—'}</td>
+        <td>${badgeStatutChauffeur(c)}</td>
+        <td>
+          <div class="td-actions" style="flex-wrap:nowrap">
+              <button class="btn btn-sm btn-danger" onclick="supprimerChauffeur(${c.id})">🗑️ Désactiver</button>
+              <button class="btn btn-sm" onclick="resetPassword(${c.id}, '${c.name}')"
+               style="background:#1a1a1a;color:white;border:1px solid #444;padding:4px 10px;
+               border-radius:6px;font-size:12px;cursor:pointer">
+                🔑 Mot de passe
+              </button>
+          </div>
+        </td>
+      </tr>`).join('');
+  } catch(e) { notif('Erreur chargement chauffeurs', 'error'); }
+}
+ 
+async function resetPassword(id, nom) {
+  const newPass = prompt(`Nouveau mot de passe pour ${nom} :`);
+  if (!newPass) return;
+  if (newPass.length < 4) { notif('Mot de passe trop court (min. 4 caractères)', 'error'); return; }
+  try {
+    const r = await fetch(`/api/chauffeurs/${id}/password`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: newPass })
+    });
+    const data = await r.json();
+    if (data.success) notif(`✅ Mot de passe de ${nom} modifié`, 'success');
+    else notif('Erreur : ' + data.message, 'error');
+  } catch(e) { notif('Erreur réseau', 'error'); }
+}
+ 
+function ouvrirModalChauffeur() {
+  document.getElementById('chauffeurEditId').value = '';
+  document.getElementById('modalChauffeurTitle').textContent = 'AJOUTER UN CHAUFFEUR';
+  ['c_prenom','c_nom','c_email','c_tel','c_password'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('c_statut').value = 'actif';
+  ouvrirModal('modalChauffeur');
+}
+ 
+async function sauvegarderChauffeur() {
+  const prenom   = document.getElementById('c_prenom').value.trim();
+  const nom      = document.getElementById('c_nom').value.trim();
+  const email    = document.getElementById('c_email').value.trim();
+  const tel      = document.getElementById('c_tel').value.trim();
+  const password = document.getElementById('c_password').value;
+  if (!prenom || !nom || !email || !password) { notif('Remplis tous les champs obligatoires', 'error'); return; }
+  try {
+    const r = await fetch('/api/chauffeurs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prenom, nom, email, password, tel })
+    });
+    const data = await r.json();
+    if (data.success) { fermerModal('modalChauffeur'); chargerChauffeurs(); notif('✅ Chauffeur créé dans Odoo !', 'success'); }
+    else notif('Erreur : ' + data.message, 'error');
+  } catch(e) { notif('Erreur serveur', 'error'); }
+}
+ 
+async function supprimerChauffeur(id) {
+  if (!confirm('Désactiver ce chauffeur ?')) return;
+  try {
+    await fetch(`/api/chauffeurs/${id}`, { method: 'DELETE' });
+    notif('Chauffeur désactivé', 'success');
+    chargerChauffeurs();
+  } catch(e) { notif('Erreur suppression', 'error'); }
+}
+ 
+// ================================================
+// MISSIONS
+// ================================================
+async function chargerMissions() {
+  try {
+    const r = await fetch('/api/missions');
+    const missions = await r.json();
+    // Stocke les missions en cours globalement pour le statut chauffeur
+    window._missionsEnCours = missions.filter(m => m.statut === 'en_cours');
+ 
+    const dash = document.getElementById('dashMissions');
+    if (dash) {
+      dash.innerHTML = missions.slice(0,5).map(m => `
+        <tr>
+          <td>${m.name}</td>
+          <td>${m.destination||'—'}</td>
+          <td>${badgeMission(m.statut)}</td>
+        </tr>`).join('') || '<tr class="empty-row"><td colspan="3">Aucune mission</td></tr>';
+    }
+ 
+    const tbl = document.getElementById('tableMissions');
+    if (tbl) {
+      tbl.innerHTML = missions.map(m => `
+        <tr>
+          <td><strong>${m.name}</strong></td>
+          <td>${m.vehicle_id ? m.vehicle_id[1] : '—'}</td>
+          <td>${m.note ? m.note.replace('Chauffeur: ', '') : '—'}</td>
+          <td>${m.destination||'—'}</td>
+          <td style="font-size:12px;color:#888">${m.heure_debut ? m.heure_debut.split(' ')[0] : '—'}</td>
+          <td>${badgeMission(m.statut)}</td>
+          <td>
+            <div class="td-actions">
+              ${m.statut === 'en_cours' ? `<button class="btn btn-sm btn-danger" onclick="terminerMission(${m.id})">🏁 Terminer</button>` : ''}
+            </div>
+          </td>
+        </tr>`).join('') || '<tr class="empty-row"><td colspan="7">Aucune mission</td></tr>';
+    }
+  } catch(e) { notif('Erreur chargement missions','error'); }
+}
+ 
+async function ouvrirModalMission() {
+  const selV = document.getElementById('m_vehicule');
+  selV.innerHTML = '<option value="">-- Choisir un véhicule --</option>';
+  vehiculesCache.filter(v => !v.statut || v.statut === 'disponible').forEach(v => {
+    selV.innerHTML += `<option value="${v.id}">${v.name} — ${v.license_plate||''}</option>`;
+  });
+  const selC = document.getElementById('m_chauffeur');
+  selC.innerHTML = '<option value="">-- Choisir un chauffeur --</option>';
+  chauffeursCache.filter(c => c.statut === 'actif').forEach(c => {
+    selC.innerHTML += `<option value="${c.id}">${c.prenom} ${c.nom}</option>`;
+  });
+  document.getElementById('m_destination').value = '';
+  const now = new Date().toISOString().slice(0,16);
+  document.getElementById('m_debut').value = now;
+  document.getElementById('m_fin').value   = '';
+  ouvrirModal('modalMission');
+}
+ 
+async function sauvegarderMission() {
+  const vehiculeId  = document.getElementById('m_vehicule').value;
+  const destination = document.getElementById('m_destination').value.trim();
+  const heure_debut = document.getElementById('m_debut').value;
+  if (!vehiculeId) { notif('Sélectionne un véhicule','error'); return; }
+  if (!destination) { notif('Entre une destination','error'); return; }
+  try {
+    const r = await fetch('/api/missions', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ vehicle_id:parseInt(vehiculeId), driver_name:'Admin', heure_debut:new Date(heure_debut).toISOString() })
+    });
+    const res = await r.json();
+    if (res.success) {
+      await fetch(`/api/missions/${res.id}/destination`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ destination }) });
+      await fetch(`/api/vehicles/${vehiculeId}/statut`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ statut:'en_mission' }) });
+      fermerModal('modalMission');
+      chargerMissions();
+      chargerVehicules();
+      notif('Mission créée ✓','success');
+    }
+  } catch(e) { notif('Erreur création mission','error'); }
+}
+ 
+async function terminerMission(id) {
+  if (!confirm('Terminer cette mission ?')) return;
+  try {
+    await fetch(`/api/missions/${id}/terminer`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ heure_fin:new Date().toISOString() }) });
+    chargerMissions();
+    chargerVehicules();
+    notif('Mission terminée ✓','success');
+  } catch(e) { notif('Erreur','error'); }
+}
+ 
+// ================================================
+// CARTE GPS EN TEMPS RÉEL
+// ================================================
+const dernieresPositions = {};
+ 
+function initialiserCarte() {
+  if (carteAdmin) { carteAdmin.invalidateSize(); return; }
+  carteAdmin = L.map('map-admin').setView([5.3600, -4.0083], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(carteAdmin);
+  Object.entries(dernieresPositions).forEach(([vid, data]) => afficherMarqueur(vid, data));
+}
+ 
+function afficherMarqueur(vehicule_id, data) {
+  const { lat, lng, plaque, vehicule_nom, enligne, timestamp } = data;
+  if (!carteAdmin || !lat || !lng) return;
+ // Couleur selon état connexion
+  const couleur  = enligne !== false ? '#CC0000' : '#888888';
+  const iconeEmoji = enligne !== false ? '🚗' : '📴';
+ 
+  // Heure de dernière position
+  const heureStr = timestamp
+    ? new Date(timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    : '—';
+ 
+  const htmlMarqueur = `
+    <div style="
+      background:${couleur};
+      color:white;
+      padding:5px 10px;
+      border-radius:8px;
+      font-size:12px;
+      font-weight:bold;
+      white-space:nowrap;
+      box-shadow:0 3px 10px rgba(0,0,0,0.3);
+      border:2px solid white;
+      opacity:${enligne !== false ? '1' : '0.6'};
+    ">
+      ${iconeEmoji} ${plaque}
+      ${enligne === false ? `<br><span style="font-size:10px;font-weight:400;opacity:0.85">⏱ ${heureStr}</span>` : ''}
+    </div>`;
+ 
+  const popupContent = `
+    ${iconeEmoji} <strong>${vehicule_nom || plaque}</strong><br>
+    📍 ${parseFloat(lat).toFixed(5)}, ${parseFloat(lng).toFixed(5)}<br>
+    <span style="font-size:11px;color:${enligne !== false ? '#22c55e' : '#888'}">
+      ${enligne !== false ? '🟢 En ligne' : '🔴 Hors ligne'} · ${heureStr}
+    </span>`;
+ 
+  if (marqueursCarte[vehicule_id]) {
+    marqueursCarte[vehicule_id].setLatLng([lat, lng]);
+    marqueursCarte[vehicule_id].setIcon(L.divIcon({
+      html: htmlMarqueur,
+      className: '',
+      iconAnchor: [30, 15]
+    }));
+    marqueursCarte[vehicule_id].getPopup().setContent(popupContent);
+  } else {
+    marqueursCarte[vehicule_id] = L.marker([lat, lng], {
+      icon: L.divIcon({ html: htmlMarqueur, className: '', iconAnchor: [30, 15] })
+    }).addTo(carteAdmin).bindPopup(popupContent);
+  }
+}
+ 
+// ── BLOC 3 ──────────────────────────────────────────────────
+// Modifie le socket.on('vehicle_position_updated') existant
+// Pour transmettre le timestamp et l'état en ligne
+// ────────────────────────────────────────────────────────────
+ 
+// REMPLACE l'écouteur vehicle_position_updated existant par celui-ci :
+socket.on('vehicle_position_updated', data => {
+  const { vehicule_id, plaque, lat, lng, vehicule_nom, timestamp } = data;
+  if (!lat || !lng) return;
+ 
+  dernieresPositions[vehicule_id] = {
+    lat, lng, plaque, vehicule_nom,
+    enligne: true,
+    timestamp: timestamp || new Date().toISOString()
+  };
+ 
+  const count = Object.values(dernieresPositions).filter(p => p.enligne !== false).length;
+  document.getElementById('vehiculesEnDirectCount').textContent = `${count} véhicule(s) en direct`;
+  if (document.getElementById('carteVehiculeCount')) {
+    document.getElementById('carteVehiculeCount').textContent = `${count} véhicule(s) tracé(s)`;
+  }
+ 
+  afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
+});
+ 
+socket.on('chauffeur_arrive', data => {
+  notif(`✅ ${data.chauffeur || 'Un chauffeur'} est arrivé à destination !`, 'info');
+});
+
+socket.on('vehicule_libere', data => {
+  chargerVehicules();
+  chargerMissions();
+});
+
+socket.on('mission_demarree', data => {
+  chargerMissions();
+  chargerVehicules();
+  notif(`🚀 Nouvelle mission démarrée !`, 'info');
+});
+
+socket.on('mission_terminee', data => {
+  chargerMissions();
+  chargerVehicules();
+  notif('🏁 Mission terminée par le chauffeur', 'info');
+});
+// ── BLOC 2 ──────────────────────────────────────────────────
+// Ajoute ces 2 écouteurs Socket.io APRÈS les écouteurs existants
+// (après le socket.on('mission_demarree', ...) existant)
+// ────────────────────────────────────────────────────────────
+ 
+// Chauffeur vient de se connecter
+socket.on('chauffeur_en_ligne', data => {
+  const { vehicule_id, plaque, chauffeur, vehicule_nom } = data;
+
+  if (dernieresPositions[vehicule_id]) {
+    dernieresPositions[vehicule_id].enligne = true;
+    afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
+  }
+
+  // Rafraîchit les données sans que l'admin touche rien
+  chargerVehicules();
+  chargerMissions();
+
+  notif(`🟢 ${chauffeur || plaque} est en ligne`, 'success');
+});
+ 
+// Chauffeur vient de se déconnecter ou GPS coupé
+socket.on('chauffeur_hors_ligne', data => {
+  const { vehicule_id, plaque, chauffeur, vehicule_nom, derniere_position, raison } = data;
+ 
+  // Met à jour la dernière position connue comme hors ligne
+  if (derniere_position && derniere_position.lat) {
+    dernieresPositions[vehicule_id] = { ...derniere_position, enligne: false };
+    afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
+  } else if (dernieresPositions[vehicule_id]) {
+    dernieresPositions[vehicule_id].enligne = false;
+    afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
+  }
+ 
+  // Message selon la raison
+  const msg = raison === 'timeout_gps'
+    ? `⚠️ ${plaque} — GPS inactif depuis 30s`
+    : `📴 ${chauffeur || plaque} s'est déconnecté`;
+ 
+  notif(msg, 'error');
+ 
+  // Mise à jour du compteur
+  const enLigne = Object.values(dernieresPositions).filter(p => p.enligne !== false).length;
+  document.getElementById('vehiculesEnDirectCount').textContent = `${enLigne} véhicule(s) en direct`;
+  if (document.getElementById('carteVehiculeCount')) {
+    document.getElementById('carteVehiculeCount').textContent = `${enLigne} véhicule(s) tracé(s)`;
+  }
+  chargerVehicules(); // ← ajoute cette ligne
+  chargerMissions();  // ← et celle-ci
+});
+ 
+// ================================================
+// UTILITAIRES
+// ================================================
+function badgeStatut(s) {
+  const map = {
+    disponible:   ['disponible',  '✅ Disponible'],
+    en_mission:   ['en_mission',  '🚀 En mission'],
+    maintenance:  ['maintenance', '🔧 Maintenance'],
+    hors_service: ['hors_service','⛔ Hors service'],
+    occupe:       ['occupe',      '🔒 Occupé']
+  };
+  const [cls, label] = map[s] || ['disponible', '✅ Disponible'];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+ 
+function badgeMission(s) {
+  if (s === 'en_cours') return '<span class="badge en_mission">🚀 En cours</span>';
+  if (s === 'terminee') return '<span class="badge disponible">✅ Terminée</span>';
+  return `<span class="badge">${s||'—'}</span>`;
+}
+ 
+function ouvrirModal(id)  { document.getElementById(id).classList.add('open'); }
+function fermerModal(id)  { document.getElementById(id).classList.remove('open'); }
+ 
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+ 
+function notif(msg, type='info') {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.className = `notif show ${type}`;
+  setTimeout(() => el.className = 'notif', 3500);
+}
+ 
+function seDeconnecter() {
+  localStorage.removeItem('user');
+  window.location.href = '/login.html';
+}
+ 
+// Rafraîchissement automatique toutes les 10 secondes
+setInterval(() => {
+  chargerMissions();
+  chargerVehicules();
+}, 10000);
+</script>
+</body>
+</html>
