@@ -1565,7 +1565,12 @@ function seDeconnecter() {
 }
  
 // Rafraîchissement automatique toutes les 10 secondes
-setInterval(() => {
+// Chargement initial
+chargerVehicules();
+chargerMissions();
+
+// Rafraîchissement automatique toutes les 10 secondes
+window._refreshInterval = setInterval(() => {
   chargerMissions();
   chargerVehicules();
 }, 10000);

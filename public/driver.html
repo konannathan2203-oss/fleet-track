@@ -1292,7 +1292,7 @@ async function terminerMission() {
     // Notifie le serveur que la mission est terminée
     socket.emit('vehicule_libere', {
       vehicule_id: vehiculeSelectionne.id,
-      plaque: vehiculeSelectionne.license_plate
+      plaque: vehiculeSelectionne.plaque  // ← était license_plate (undefined)
     });
     socket.emit('mission_terminee', {
       mission_id: missionActive.id,

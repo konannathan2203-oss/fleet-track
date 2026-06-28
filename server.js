@@ -699,10 +699,9 @@ io.on('connection', (socket) => {
     console.log(`🔓 Véhicule libéré : ${data.plaque}`);
   });
   socket.on('mission_terminee', data => {
+    console.log('📡 Broadcast mission_terminee:', data);
     io.emit('mission_terminee', data);
-    console.log(`✅ Mission terminée broadcast : ${data.mission_id}`);
   });
- 
   // ── 4. Déconnexion ──
   socket.on('disconnect', () => {
     console.log('🔌 Appareil déconnecté:', socket.id);
