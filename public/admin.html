@@ -1571,6 +1571,7 @@ socket.on('vehicule_libere', data => {
 socket.on('mission_demarree', data => {
   chargerMissions();
   chargerVehicules();
+  chargerChauffeurs();
   notif(`🚀 Nouvelle mission démarrée !`, 'info');
 });
 
@@ -1578,6 +1579,7 @@ socket.on('mission_terminee', data => {
   setTimeout(() => {
     chargerMissions();
     chargerVehicules();
+    chargerChauffeurs();
   }, 1500);
   notif('🏁 Mission terminée par le chauffeur', 'info');
 });
