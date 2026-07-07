@@ -1003,25 +1003,18 @@ function demarrerSuiviGPS() {
     socket.emit('gps_position', positionData);
  
     // ── Envoi 2 : Service Worker (background + file d'attente) ──
-    if (swRegistration && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'GPS_POSITION',
-        data: positionData
-      });
-    } else {
-      // Fallback direct si SW pas encore actif
-      fetch('/api/gps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    // ── Envoi 2 : Service Worker (background + file d'attente) ──
+// Sauvegarde GPS directe dans Odoo
+    fetch('/api/gps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         vehicle_id: vehiculeSelectionne.id,
         mission_id: missionActive.id,
         latitude: lat,
-        longitude: lng,
-        timestamp: new Date().toISOString()
+        longitude: lng
       })
-    }).catch(() => {});
-    }
+    }).catch(err => console.warn('GPS save error:', err));
  
   }, err => notif('GPS : ' + err.message, 'error'),
   { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 });
