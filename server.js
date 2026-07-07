@@ -378,20 +378,32 @@ app.post('/api/chauffeurs', async (req, res) => {
     }, { headers: { Cookie: cookies } });
     const userId = createUser.data.result;
     await axios.post(`${ODOO_URL}/web/dataset/call_kw`, {
-      jsonrpc: '2.0', method: 'call',
-      params: {
-        model: 'res.users',
-        method: 'write',
-        args: [[userId], { password: password }],
-        kwargs: {}
-      }
-    }, { headers: { Cookie: cookies } });
-    console.log(`✅ Chauffeur créé dans Odoo : ${prenom} ${nom} (ID: ${userId})`);
-    res.json({ success: true, id: userId });
-  } catch (error) {
-    console.error('❌ Erreur création chauffeur:', error.response?.data || error.message);
-    res.status(500).json({ success: false, message: error.message });
+  jsonrpc: '2.0', method: 'call',
+  params: {
+    model: 'res.users',
+    method: 'write',
+    args: [[userId], { password: password }],
+    kwargs: {}
   }
+}, { headers: { Cookie: cookies } });
+
+// Force le groupe utilisateur interne
+await axios.post(`${ODOO_URL}/web/dataset/call_kw`, {
+  jsonrpc: '2.0', method: 'call',
+  params: {
+    model: 'res.users',
+    method: 'write',
+    args: [[userId], { sel_groups_1_10_11: 1 }],
+    kwargs: {}
+  }
+}, { headers: { Cookie: cookies } });
+
+console.log(`✅ Chauffeur créé dans Odoo : ${prenom} ${nom} (ID: ${userId})`);
+res.json({ success: true, id: userId });
+} catch (error) {
+  console.error('❌ Erreur création chauffeur:', error.response?.data || error.message);
+  res.status(500).json({ success: false, message: error.message });
+}
 });
  
 app.get('/api/chauffeurs', async (req, res) => {
@@ -406,8 +418,8 @@ app.get('/api/chauffeurs', async (req, res) => {
       params: {
         model: 'res.users',
         method: 'search_read',
-        args: [[['share', '=', false], ['id', '!=', 1]]],
-        kwargs: { fields: ['id', 'name', 'email', 'phone', 'active'], limit: 100 }
+        args: [[['share', '=', false], ['id', '!=', 1], ['active', '=', true]]],
+        kwargs: { fields: ['id', 'name', 'email', 'phone', 'active', 'login'], limit: 100 }
       }
     }, { headers: { Cookie: cookies } });
     res.json(response.data.result || []);
