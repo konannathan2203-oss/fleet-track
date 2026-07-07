@@ -229,24 +229,24 @@ app.get('/api/gps/:mission_id', async (req, res) => {
       jsonrpc: '2.0', method: 'call',
       params: { db: ODOO_DB, login: ODOO_LOGIN, password: ODOO_PASSWORD }
     });
-    const cookies = authResponse.headers['set-cookie'];
-    const sessionCookie = cookies ? cookies.join(';') : '';
+    const cookies = authResponse.headers['set-cookie'].join(';');
 
     const response = await axios.post(`${ODOO_URL}/web/dataset/call_kw`, {
       jsonrpc: '2.0', method: 'call',
       params: {
         model: 'fleet.gps.position',
         method: 'search_read',
-        args: [[]],
+        args: [[['mission_id', '=', mission_id]]],  // ← filtre par mission
         kwargs: {
           fields: ['latitude', 'longitude', 'vehicle_id', 'create_date'],
           order: 'create_date asc',
           limit: 500
         }
       }
-    }, { headers: { Cookie: sessionCookie } });
+    }, { headers: { Cookie: cookies } });
 
     const points = response.data.result || [];
+    console.log(`📍 GPS mission ${mission_id}: ${points.length} points`);
     res.json(points);
   } catch (error) {
     res.status(500).json({ message: error.message });
