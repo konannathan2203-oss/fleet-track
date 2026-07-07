@@ -843,7 +843,7 @@ async function demarrerMission() {
     });
     const data = await r.json();
     if (!data.success) throw new Error(data.message);
-    missionActive = { id:data.id, ...vehiculeSelectionne };
+    missionActive = { id:data.id, nom: vehiculeSelectionne.nom, plaque: vehiculeSelectionne.plaque };
     localStorage.setItem('missionActive', JSON.stringify(missionActive));
     localStorage.setItem('vehiculeSelectionne', JSON.stringify(vehiculeSelectionne));
 
