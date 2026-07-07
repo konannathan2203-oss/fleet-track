@@ -1014,12 +1014,13 @@ function demarrerSuiviGPS() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mission_id: missionActive.id,
-          latitude: lat,
-          longitude: lng,
-          timestamp: new Date().toISOString()
-        })
-      }).catch(() => {});
+        vehicle_id: vehiculeSelectionne.id,
+        mission_id: missionActive.id,
+        latitude: lat,
+        longitude: lng,
+        timestamp: new Date().toISOString()
+      })
+    }).catch(() => {});
     }
  
   }, err => notif('GPS : ' + err.message, 'error'),
