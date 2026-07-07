@@ -785,7 +785,7 @@ async function chargerVehicules() {
 }
  
 function selectionnerVehicule(id, nom, plaque, el) {
-  vehiculeSelectionne = { id, nom, plaque };
+  vehiculeSelectionne = { id, nom, plaque, license_plate: plaque };
   document.querySelectorAll('.vehicle-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   document.getElementById('btnDemarrer').disabled = false;

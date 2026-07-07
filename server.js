@@ -698,6 +698,9 @@ io.on('connection', (socket) => {
     io.emit('vehicule_libere', data);
     console.log(`🔓 Véhicule libéré : ${data.plaque}`);
   });
+  socket.on('statut_vehicule_change', data => {
+    io.emit('statut_vehicule_change', data);
+  });
   socket.on('mission_terminee', data => {
     console.log('📡 Broadcast mission_terminee:', data);
     io.emit('mission_terminee', data);

@@ -1062,15 +1062,17 @@ async function chargerVehicules() {
     const r = await fetch('/api/vehicles');
     vehiculesCache = await r.json();
  
-    const stats = { disponible:0, en_mission:0, maintenance:0, hors_service:0, occupe:0 };
-    vehiculesCache.forEach(v => {
-      if(stats[v.statut] !== undefined) stats[v.statut]++;
-      else if(!v.statut) stats.disponible++;
-    });
-    document.getElementById('s-disponible').textContent  = stats.disponible;
-    document.getElementById('s-mission').textContent     = stats.en_mission + stats.occupe;
-    document.getElementById('s-maintenance').textContent = stats.maintenance;
-    document.getElementById('s-hors').textContent        = stats.hors_service;
+  const stats = { disponible:0, en_mission:0, maintenance:0, hors_service:0, occupe:0 };
+  vehiculesCache.forEach(v => {
+    const s = v.statut || 'disponible';
+    if (s === 'occupe' || s === 'en_mission') stats.en_mission++;
+    else if (stats[s] !== undefined) stats[s]++;
+    else stats.disponible++;
+  });
+  document.getElementById('s-disponible').textContent  = stats.disponible;
+  document.getElementById('s-mission').textContent     = stats.en_mission;
+  document.getElementById('s-maintenance').textContent = stats.maintenance;
+  document.getElementById('s-hors').textContent        = stats.hors_service;
  
     const dash = document.getElementById('dashVehicules');
     dash.innerHTML = vehiculesCache.slice(0,5).map(v => `
@@ -1469,9 +1471,15 @@ socket.on('mission_demarree', data => {
 });
 
 socket.on('mission_terminee', data => {
-  chargerMissions();
-  chargerVehicules();
+  setTimeout(() => {
+    chargerMissions();
+    chargerVehicules();
+  }, 1500);
   notif('🏁 Mission terminée par le chauffeur', 'info');
+});
+
+socket.on('statut_vehicule_change', data => {
+  chargerVehicules();
 });
 // ── BLOC 2 ──────────────────────────────────────────────────
 // Ajoute ces 2 écouteurs Socket.io APRÈS les écouteurs existants
