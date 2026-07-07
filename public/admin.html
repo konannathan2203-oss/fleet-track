@@ -1175,6 +1175,7 @@ async function voirHistoriqueVehicule(id, nom) {
           <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">DESTINATION</th>
           <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">DATE</th>
           <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">STATUT</th>
+          <th style="padding:8px;text-align:left;color:#999;font-size:11px;letter-spacing:1px">TRAJET</th>
         </tr></thead>
         <tbody>${missions.map(m => `
           <tr style="border-top:1px solid #f5f5f5">
@@ -1182,11 +1183,114 @@ async function voirHistoriqueVehicule(id, nom) {
             <td style="padding:10px 8px">${m.destination||'—'}</td>
             <td style="padding:10px 8px;font-size:12px;color:#888">${m.heure_debut ? m.heure_debut.split(' ')[0] : '—'}</td>
             <td style="padding:10px 8px">${badgeMission(m.statut)}</td>
+            <td style="padding:10px 8px">
+              ${m.statut === 'terminee' ? `
+                <button onclick="voirTrajetMission(${m.id},'${m.name}')"
+                  style="background:#0f0f0f;color:white;border:none;padding:5px 10px;
+                  border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap">
+                  🗺️ Trajet
+                </button>` : '—'}
+            </td>
           </tr>`).join('')}
         </tbody>
       </table>`;
   } catch(e) {
     document.getElementById('modalHistoriqueBody').innerHTML = '<p style="color:red;text-align:center;padding:20px">Erreur de chargement</p>';
+  }
+}
+
+async function voirTrajetMission(missionId, missionNom) {
+  // Ferme le modal historique et ouvre le modal trajet
+  fermerModal('modalHistorique');
+
+  // Crée un modal trajet dynamiquement s'il n'existe pas
+  if (!document.getElementById('modalTrajet')) {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="modal-overlay" id="modalTrajet">
+        <div class="modal" style="max-width:700px">
+          <div class="modal-head">
+            <h3 id="modalTrajetTitle">TRAJET</h3>
+            <button class="modal-close" onclick="fermerModal('modalTrajet')">×</button>
+          </div>
+          <div class="modal-body" style="padding:0">
+            <div id="map-trajet" style="height:420px;border-radius:0"></div>
+            <div id="trajet-stats" style="padding:14px 20px;display:flex;gap:24px;border-top:1px solid #f0f0f0"></div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-secondary" onclick="fermerModal('modalTrajet')">Fermer</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(div.firstElementChild);
+  }
+
+  document.getElementById('modalTrajetTitle').textContent = `TRAJET — ${missionNom}`;
+  document.getElementById('trajet-stats').innerHTML = '<p style="color:#bbb;font-size:13px">Chargement du trajet...</p>';
+  document.getElementById('map-trajet').innerHTML = '';
+  ouvrirModal('modalTrajet');
+
+  try {
+    const r = await fetch(`/api/gps/${missionId}`);
+    const points = await r.json();
+
+    if (!points.length) {
+      document.getElementById('trajet-stats').innerHTML = '<p style="color:#bbb;font-size:13px">Aucune position GPS enregistrée pour cette mission.</p>';
+      return;
+    }
+
+    // Initialise la carte trajet
+    setTimeout(() => {
+      const carteTrajet = L.map('map-trajet').setView([5.3600, -4.0083], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(carteTrajet);
+
+      const coords = points.map(p => [parseFloat(p.latitude), parseFloat(p.longitude)]);
+
+      // Polyline du trajet
+      const polyline = L.polyline(coords, {
+        color: '#CC0000', weight: 4, opacity: 0.8
+      }).addTo(carteTrajet);
+
+      // Marqueur départ (vert)
+      L.marker(coords[0], {
+        icon: L.divIcon({
+          html: `<div style="background:#16a34a;color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🟢 Départ</div>`,
+          className: '', iconAnchor: [30, 10]
+        })
+      }).addTo(carteTrajet);
+
+      // Marqueur arrivée (rouge)
+      L.marker(coords[coords.length - 1], {
+        icon: L.divIcon({
+          html: `<div style="background:#CC0000;color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.3)">🏁 Arrivée</div>`,
+          className: '', iconAnchor: [30, 10]
+        })
+      }).addTo(carteTrajet);
+
+      // Zoom sur le trajet
+      carteTrajet.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+
+      // Stats
+      document.getElementById('trajet-stats').innerHTML = `
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:28px;color:#0f0f0f">${points.length}</div>
+          <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px">Points GPS</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:28px;color:#0f0f0f">${points[0]?.create_date?.split(' ')[1]?.slice(0,5) || '—'}</div>
+          <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px">Heure départ</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Bebas Neue',cursive;font-size:28px;color:#0f0f0f">${points[points.length-1]?.create_date?.split(' ')[1]?.slice(0,5) || '—'}</div>
+          <div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:0.5px">Heure arrivée</div>
+        </div>`;
+
+    }, 200);
+
+  } catch(e) {
+    document.getElementById('trajet-stats').innerHTML = '<p style="color:red;font-size:13px">Erreur chargement trajet</p>';
   }
 }
  
