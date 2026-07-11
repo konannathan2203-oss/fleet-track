@@ -213,6 +213,10 @@
       background: #4CAF50;
       animation: pulse 2s infinite;
     }
+
+    .topbar-right { 
+      gap: 16px; 
+    }
  
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
  
@@ -780,6 +784,39 @@
       <div class="live-indicator">
         <div class="live-dot"></div>
         <span id="vehiculesEnDirectCount">0 véhicule(s) en direct</span>
+      </div>
+
+      <!-- CLOCHE NOTIFICATIONS -->
+      <div style="position:relative">
+        <button id="btnNotif" onclick="toggleNotifications()" style="
+          background:none;border:none;cursor:pointer;
+          font-size:20px;padding:6px 10px;border-radius:8px;
+          position:relative;transition:background 0.2s;
+        " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='none'">
+          🔔
+          <span id="notifBadge" style="
+            display:none;position:absolute;top:2px;right:4px;
+            background:#CC0000;color:white;border-radius:50%;
+            width:16px;height:16px;font-size:10px;font-weight:700;
+            align-items:center;justify-content:center;
+          ">0</span>
+        </button>
+
+        <!-- PANNEAU NOTIFICATIONS -->
+        <div id="notifPanel" style="
+          display:none;position:absolute;right:0;top:48px;
+          width:320px;background:white;border-radius:10px;
+          box-shadow:0 8px 32px rgba(0,0,0,0.15);z-index:1000;
+          border:1px solid #f0f0f0;overflow:hidden;
+        ">
+          <div style="padding:14px 16px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-family:'Bebas Neue',cursive;font-size:16px;letter-spacing:1px">NOTIFICATIONS</span>
+            <button onclick="effacerNotifications()" style="background:none;border:none;font-size:11px;color:#999;cursor:pointer">Tout effacer</button>
+          </div>
+          <div id="notifList" style="max-height:320px;overflow-y:auto">
+            <p style="text-align:center;color:#bbb;padding:20px;font-size:13px">Aucune notification</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1572,6 +1609,7 @@ socket.on('mission_demarree', data => {
   chargerMissions();
   chargerVehicules();
   chargerChauffeurs();
+  ajouterNotification('🚀 Nouvelle mission démarrée !', 'info');
   notif(`🚀 Nouvelle mission démarrée !`, 'info');
 });
 
@@ -1581,6 +1619,7 @@ socket.on('mission_terminee', data => {
     chargerVehicules();
     chargerChauffeurs();
   }, 1500);
+  ajouterNotification('🏁 Mission terminée par le chauffeur', 'info');
   notif('🏁 Mission terminée par le chauffeur', 'info');
 });
 
@@ -1601,18 +1640,17 @@ socket.on('chauffeur_en_ligne', data => {
     afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
   }
 
-  // Rafraîchit les données sans que l'admin touche rien
   chargerVehicules();
   chargerMissions();
 
+  ajouterNotification(`🟢 ${chauffeur || plaque} est en ligne`, 'success');
   notif(`🟢 ${chauffeur || plaque} est en ligne`, 'success');
 });
- 
+
 // Chauffeur vient de se déconnecter ou GPS coupé
 socket.on('chauffeur_hors_ligne', data => {
   const { vehicule_id, plaque, chauffeur, vehicule_nom, derniere_position, raison } = data;
- 
-  // Met à jour la dernière position connue comme hors ligne
+
   if (derniere_position && derniere_position.lat) {
     dernieresPositions[vehicule_id] = { ...derniere_position, enligne: false };
     afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
@@ -1620,22 +1658,21 @@ socket.on('chauffeur_hors_ligne', data => {
     dernieresPositions[vehicule_id].enligne = false;
     afficherMarqueur(vehicule_id, dernieresPositions[vehicule_id]);
   }
- 
-  // Message selon la raison
+
   const msg = raison === 'timeout_gps'
     ? `⚠️ ${plaque} — GPS inactif depuis 30s`
     : `📴 ${chauffeur || plaque} s'est déconnecté`;
- 
+
+  ajouterNotification(msg, 'error');
   notif(msg, 'error');
- 
-  // Mise à jour du compteur
+
   const enLigne = Object.values(dernieresPositions).filter(p => p.enligne !== false).length;
   document.getElementById('vehiculesEnDirectCount').textContent = `${enLigne} véhicule(s) en direct`;
   if (document.getElementById('carteVehiculeCount')) {
     document.getElementById('carteVehiculeCount').textContent = `${enLigne} véhicule(s) tracé(s)`;
   }
-  chargerVehicules(); // ← ajoute cette ligne
-  chargerMissions();  // ← et celle-ci
+  chargerVehicules();
+  chargerMissions();
 });
  
 // ================================================
@@ -1683,11 +1720,72 @@ function seDeconnecter() {
 chargerVehicules();
 chargerMissions();
 
+// ================================================
+// CENTRE DE NOTIFICATIONS
+// ================================================
+let notifications = [];
+
+function ajouterNotification(msg, type='info') {
+  const n = {
+    id: Date.now(),
+    msg,
+    type,
+    heure: new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+  };
+  notifications.unshift(n);
+  if (notifications.length > 20) notifications.pop();
+  renderNotifications();
+}
+
+function renderNotifications() {
+  const list = document.getElementById('notifList');
+  const badge = document.getElementById('notifBadge');
+
+  if (!notifications.length) {
+    list.innerHTML = '<p style="text-align:center;color:#bbb;padding:20px;font-size:13px">Aucune notification</p>';
+    badge.style.display = 'none';
+    return;
+  }
+
+  const icones = { success:'✅', error:'🔴', info:'🔵' };
+  list.innerHTML = notifications.map(n => `
+    <div style="padding:12px 16px;border-bottom:1px solid #f9f9f9;display:flex;gap:10px;align-items:flex-start">
+      <span style="font-size:14px;flex-shrink:0">${icones[n.type]||'🔔'}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;color:#333">${n.msg}</div>
+        <div style="font-size:11px;color:#bbb;margin-top:2px">${n.heure}</div>
+      </div>
+    </div>`).join('');
+
+  badge.style.display = 'flex';
+  badge.textContent = notifications.length > 9 ? '9+' : notifications.length;
+}
+
+function toggleNotifications() {
+  const panel = document.getElementById('notifPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function effacerNotifications() {
+  notifications = [];
+  renderNotifications();
+  document.getElementById('notifPanel').style.display = 'none';
+}
+
+// Ferme le panneau si on clique ailleurs
+document.addEventListener('click', e => {
+  if (!e.target.closest('#btnNotif') && !e.target.closest('#notifPanel')) {
+    const panel = document.getElementById('notifPanel');
+    if (panel) panel.style.display = 'none';
+  }
+});
+
 // Rafraîchissement automatique toutes les 10 secondes
 window._refreshInterval = setInterval(() => {
   chargerMissions();
   chargerVehicules();
 }, 10000);
+
 </script>
 </body>
 </html>
