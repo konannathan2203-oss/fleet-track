@@ -756,6 +756,9 @@
     </div>
  
     <div class="nav-section">Outils</div>
+    <div class="nav-item" onclick="afficherPage('statistiques')">
+      <span class="icon">📊</span> Statistiques
+    </div>
     <div class="nav-item" onclick="window.location.href='/qrcodes.html'">
       <span class="icon"></span> QR Codes
     </div>
@@ -763,7 +766,7 @@
  
   <div class="sidebar-bottom">
     <button class="btn-logout" onclick="seDeconnecter()">
-      🚪 Déconnexion
+       Déconnexion
     </button>
   </div>
 </aside>
@@ -1002,6 +1005,89 @@
       </div>
     </div>
   </div>
+
+  <!-- ========================
+     PAGE : STATISTIQUES
+======================== -->
+<div class="page" id="page-statistiques">
+  <div class="stats-row" id="statsGlobales">
+    <div class="stat-card disponible">
+      <div>
+        <div class="stat-label">Total missions</div>
+        <div class="stat-value" id="stat-total-missions">—</div>
+      </div>
+      <div class="stat-icon">🚀</div>
+    </div>
+    <div class="stat-card mission">
+      <div>
+        <div class="stat-label">Missions terminées</div>
+        <div class="stat-value" id="stat-terminees">—</div>
+      </div>
+      <div class="stat-icon">✅</div>
+    </div>
+    <div class="stat-card maintenance">
+      <div>
+        <div class="stat-label">Missions en cours</div>
+        <div class="stat-value" id="stat-en-cours">—</div>
+      </div>
+      <div class="stat-icon">⏳</div>
+    </div>
+    <div class="stat-card hors">
+      <div>
+        <div class="stat-label">Total véhicules</div>
+        <div class="stat-value" id="stat-total-vehicules">—</div>
+      </div>
+      <div class="stat-icon">🚗</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- Missions par véhicule -->
+    <div class="section-card">
+      <div class="section-head">
+        <h2>📊 MISSIONS PAR VÉHICULE</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Véhicule</th>
+              <th>Plaque</th>
+              <th>Total missions</th>
+              <th>Terminées</th>
+              <th>En cours</th>
+            </tr>
+          </thead>
+          <tbody id="statsMissionsVehicule">
+            <tr class="loading-row"><td colspan="5">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Missions par chauffeur -->
+    <div class="section-card">
+      <div class="section-head">
+        <h2>👤 MISSIONS PAR CHAUFFEUR</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Chauffeur</th>
+              <th>Total missions</th>
+              <th>Terminées</th>
+              <th>En cours</th>
+            </tr>
+          </thead>
+          <tbody id="statsMissionsChauffeur">
+            <tr class="loading-row"><td colspan="4">Chargement...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
  
 </main>
  
@@ -1050,7 +1136,8 @@ const titres = {
   carte: 'CARTE EN DIRECT',
   vehicules: 'VÉHICULES',
   chauffeurs: 'CHAUFFEURS',
-  missions: 'MISSIONS'
+  missions: 'MISSIONS',
+  statistiques: 'STATISTIQUES'
 };
  
 function afficherPage(nom) {
@@ -1073,6 +1160,7 @@ function afficherPage(nom) {
   if (nom === 'chauffeurs') chargerChauffeurs();
   if (nom === 'missions')   chargerMissions();
   if (nom === 'carte')      initialiserCarte();
+  if (nom === 'statistiques') chargerStatistiques();
  
   // Ferme la sidebar sur mobile après navigation (NOUVEAU)
   fermerSidebar();
@@ -1791,6 +1879,73 @@ document.addEventListener('click', e => {
     if (panel) panel.style.display = 'none';
   }
 });
+
+async function chargerStatistiques() {
+  try {
+    const [rMissions, rVehicules] = await Promise.all([
+      fetch('/api/missions'),
+      fetch('/api/vehicles')
+    ]);
+    const missions  = await rMissions.json();
+    const vehicules = await rVehicules.json();
+
+    // Stats globales
+    const terminees = missions.filter(m => m.statut === 'terminee').length;
+    const enCours   = missions.filter(m => m.statut === 'en_cours').length;
+    document.getElementById('stat-total-missions').textContent   = missions.length;
+    document.getElementById('stat-terminees').textContent        = terminees;
+    document.getElementById('stat-en-cours').textContent         = enCours;
+    document.getElementById('stat-total-vehicules').textContent  = vehicules.length;
+
+    // Stats par véhicule
+    const parVehicule = {};
+    missions.forEach(m => {
+      if (!m.vehicle_id) return;
+      const key = m.vehicle_id[0];
+      const nom = m.vehicle_id[1];
+      if (!parVehicule[key]) parVehicule[key] = { nom, total:0, terminees:0, enCours:0 };
+      parVehicule[key].total++;
+      if (m.statut === 'terminee') parVehicule[key].terminees++;
+      if (m.statut === 'en_cours') parVehicule[key].enCours++;
+    });
+
+    const tblV = document.getElementById('statsMissionsVehicule');
+    const vehiculesSorted = Object.values(parVehicule).sort((a,b) => b.total - a.total);
+    tblV.innerHTML = vehiculesSorted.map(v => {
+      const veh = vehicules.find(x => x.name === v.nom);
+      return `<tr>
+        <td><strong>${v.nom}</strong></td>
+        <td><code style="font-size:12px;background:#f5f5f5;padding:2px 6px;border-radius:4px">${veh?.license_plate||'—'}</code></td>
+        <td><strong>${v.total}</strong></td>
+        <td style="color:#16a34a">${v.terminees}</td>
+        <td style="color:#CC0000">${v.enCours}</td>
+      </tr>`;
+    }).join('') || '<tr class="empty-row"><td colspan="5">Aucune donnée</td></tr>';
+
+    // Stats par chauffeur
+    const parChauffeur = {};
+    missions.forEach(m => {
+      const nom = m.note ? m.note.replace('Chauffeur: ','') : 'Inconnu';
+      if (!parChauffeur[nom]) parChauffeur[nom] = { total:0, terminees:0, enCours:0 };
+      parChauffeur[nom].total++;
+      if (m.statut === 'terminee') parChauffeur[nom].terminees++;
+      if (m.statut === 'en_cours') parChauffeur[nom].enCours++;
+    });
+
+    const tblC = document.getElementById('statsMissionsChauffeur');
+    const chauffeursSorted = Object.values(parChauffeur)
+      .map((v, i) => ({ ...v, nom: Object.keys(parChauffeur)[i] }))
+      .sort((a,b) => b.total - a.total);
+    tblC.innerHTML = chauffeursSorted.map(c => `
+      <tr>
+        <td><strong>${c.nom}</strong></td>
+        <td><strong>${c.total}</strong></td>
+        <td style="color:#16a34a">${c.terminees}</td>
+        <td style="color:#CC0000">${c.enCours}</td>
+      </tr>`).join('') || '<tr class="empty-row"><td colspan="4">Aucune donnée</td></tr>';
+
+  } catch(e) { notif('Erreur chargement statistiques', 'error'); }
+}
 
 // Rafraîchissement automatique toutes les 10 secondes
 window._refreshInterval = setInterval(() => {
