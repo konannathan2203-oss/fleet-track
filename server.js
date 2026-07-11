@@ -765,22 +765,9 @@ io.on('connection', (socket) => {
         }
       }, { headers: { Cookie: cookies } }).then(() => ({ cookies }));
     })
-    .then(({ cookies }) => {
-      // 2. Termine la mission si elle est en cours
-      if (infos.mission_id) {
-        return axios.post(`${ODOO_URL}/web/dataset/call_kw`, {
-          jsonrpc: '2.0', method: 'call',
-          params: {
-            model: 'fleet.mission',
-            method: 'write',
-            args: [[infos.mission_id], {
-              statut: 'terminee',
-              heure_fin: new Date().toISOString().replace('T', ' ').split('.')[0]
-            }],
-            kwargs: {}
-          }
-        }, { headers: { Cookie: cookies } });
-      }
+    .then(() => {
+  // Mission NON terminée automatiquement
+  // Le chauffeur doit appuyer sur "Terminer mission"
     })
     .then(() => {
       console.log(`✅ Véhicule ${infos.plaque} libéré — Mission terminée automatiquement`);
