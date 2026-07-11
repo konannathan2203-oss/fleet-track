@@ -1170,6 +1170,18 @@ async function sauvegarderVehicule() {
   const plaque = document.getElementById('v_plaque').value.trim();
   const statut = document.getElementById('v_statut').value;
   if (!plaque) { notif('La plaque est obligatoire','error'); return; }
+
+  // Vérification doublon plaque
+  const doublon = vehiculesCache.find(v =>
+    v.license_plate &&
+    v.license_plate.toLowerCase().replace(/\s/g,'') === plaque.toLowerCase().replace(/\s/g,'') &&
+    String(v.id) !== String(id)
+  );
+  if (doublon) {
+    notif(`❌ La plaque "${plaque}" existe déjà — ${doublon.name}`, 'error');
+    ajouterNotification(`❌ Doublon plaque : "${plaque}" déjà utilisée par ${doublon.name}`, 'error');
+    return;
+  }
   const nom = marque && modele ? `${marque}/${modele}` : marque || modele || 'Véhicule';
   try {
     if (id) {
