@@ -1562,11 +1562,18 @@ async function ouvrirModalMission() {
   vehiculesCache.filter(v => !v.statut || v.statut === 'disponible').forEach(v => {
     selV.innerHTML += `<option value="${v.id}">${v.name} — ${v.license_plate||''}</option>`;
   });
+
   const selC = document.getElementById('m_chauffeur');
   selC.innerHTML = '<option value="">-- Choisir un chauffeur --</option>';
-  chauffeursCache.filter(c => c.statut === 'actif').forEach(c => {
-    selC.innerHTML += `<option value="${c.id}">${c.prenom} ${c.nom}</option>`;
-  });
+  // Recharge les chauffeurs frais
+  try {
+    const r = await fetch('/api/chauffeurs');
+    const chauffeurs = await r.json();
+    chauffeurs.forEach(c => {
+      selC.innerHTML += `<option value="${c.id}" data-nom="${c.name}">${c.name}</option>`;
+    });
+  } catch(e) {}
+
   document.getElementById('m_destination').value = '';
   const now = new Date().toISOString().slice(0,16);
   document.getElementById('m_debut').value = now;
@@ -1576,24 +1583,47 @@ async function ouvrirModalMission() {
  
 async function sauvegarderMission() {
   const vehiculeId  = document.getElementById('m_vehicule').value;
+  const chauffeurId = document.getElementById('m_chauffeur').value;
   const destination = document.getElementById('m_destination').value.trim();
   const heure_debut = document.getElementById('m_debut').value;
-  if (!vehiculeId) { notif('Sélectionne un véhicule','error'); return; }
+
+  if (!vehiculeId)  { notif('Sélectionne un véhicule','error'); return; }
   if (!destination) { notif('Entre une destination','error'); return; }
+
+  // Récupère le nom du chauffeur sélectionné
+  const selC = document.getElementById('m_chauffeur');
+  const chauffeurNom = chauffeurId
+    ? selC.options[selC.selectedIndex].getAttribute('data-nom')
+    : 'Admin';
+
   try {
     const r = await fetch('/api/missions', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ vehicle_id:parseInt(vehiculeId), driver_name:'Admin', heure_debut:new Date(heure_debut).toISOString() })
+      body: JSON.stringify({
+        vehicle_id:  parseInt(vehiculeId),
+        driver_name: chauffeurNom,
+        driver_uid:  chauffeurId ? parseInt(chauffeurId) : null,
+        heure_debut: new Date(heure_debut).toISOString()
+      })
     });
     const res = await r.json();
     if (res.success) {
-      await fetch(`/api/missions/${res.id}/destination`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ destination }) });
-      await fetch(`/api/vehicles/${vehiculeId}/statut`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ statut:'en_mission' }) });
+      await fetch(`/api/missions/${res.id}/destination`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ destination })
+      });
+      await fetch(`/api/vehicles/${vehiculeId}/statut`, {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ statut:'en_mission' })
+      });
       fermerModal('modalMission');
       chargerMissions();
       chargerVehicules();
       notif('Mission créée ✓','success');
+      ajouterNotification(`🚀 Mission créée — ${chauffeurNom} → ${destination}`, 'success');
     }
   } catch(e) { notif('Erreur création mission','error'); }
 }
